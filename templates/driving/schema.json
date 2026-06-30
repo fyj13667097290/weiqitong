@@ -1,0 +1,72 @@
+{
+  "industry": "driving",
+  "version": "1.0.0",
+  "displayName": "驾校行业模板",
+  "description": "适用于各类驾校的小程序模板：品牌展示、在线报名、预约练车、题库练习",
+  "fields": {
+    "school": {
+      "type": "object",
+      "label": "驾校基本信息",
+      "fields": {
+        "name": { "type": "string", "label": "驾校全称", "required": true, "placeholder": "如：鑫达机动车驾驶培训学校" },
+        "shortName": { "type": "string", "label": "简称", "maxLength": 10, "placeholder": "如：鑫达驾校" },
+        "logo": { "type": "image", "label": "驾校Logo", "placeholder": "https://..." },
+        "phone": { "type": "phone", "label": "联系电话" },
+        "address": { "type": "text", "label": "驾校地址" },
+        "description": { "type": "textarea", "label": "驾校简介", "maxLength": 500 },
+        "photos": { "type": "imageList", "label": "场地照片", "maxItems": 6 },
+        "theme": {
+          "type": "object",
+          "label": "主题配色",
+          "fields": {
+            "primaryColor": { "type": "color", "label": "主色调", "default": "#1890ff" }
+          }
+        }
+      }
+    },
+    "courses": {
+      "type": "array",
+      "label": "培训课程",
+      "itemSchema": {
+        "name": { "type": "string", "label": "课程名称", "required": true, "placeholder": "如：C1普通班" },
+        "price": { "type": "number", "label": "价格（元）", "required": true },
+        "originalPrice": { "type": "number", "label": "原价（元）" },
+        "features": { "type": "tags", "label": "课程特色", "placeholder": "如：免费接送,不限课时" },
+        "tag": { "type": "string", "label": "标签", "placeholder": "如：热销 或 推荐" }
+      }
+    },
+    "coaches": {
+      "type": "array",
+      "label": "教练团队",
+      "itemSchema": {
+        "name": { "type": "string", "label": "教练姓名", "required": true },
+        "avatar": { "type": "image", "label": "头像" },
+        "experience": { "type": "number", "label": "教龄（年）", "required": true },
+        "passRate": { "type": "number", "label": "通过率(%)", "min": 0, "max": 100 },
+        "rating": { "type": "number", "label": "评分(1-5)", "min": 1, "max": 5 },
+        "tags": { "type": "tags", "label": "教学特点", "placeholder": "如：耐心,技术好" },
+        "phone": { "type": "phone", "label": "联系电话" }
+      }
+    },
+    "locations": {
+      "type": "array",
+      "label": "训练场地",
+      "itemSchema": {
+        "name": { "type": "string", "label": "场地名称" },
+        "address": { "type": "text", "label": "地址" },
+        "latitude": { "type": "number", "label": "纬度" },
+        "longitude": { "type": "number", "label": "经度" }
+      }
+    },
+    "features": {
+      "type": "object",
+      "label": "功能开关",
+      "fields": {
+        "appointment": { "type": "boolean", "label": "预约练车", "default": true },
+        "examPrep": { "type": "boolean", "label": "题库练习", "default": true },
+        "onlinePayment": { "type": "boolean", "label": "在线支付", "default": false },
+        "referral": { "type": "boolean", "label": "推荐有礼", "default": false }
+      }
+    }
+  }
+}

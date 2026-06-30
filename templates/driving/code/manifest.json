@@ -1,0 +1,14 @@
+{
+  "name": "{{school_short_name}}",
+  "appid": "__WEAPP_APPID__",
+  "description": "{{school_description}}",
+  "versionName": "1.0.0",
+  "versionCode": "100",
+  "transformPx": false,
+  "mp-weixin": {
+    "appid": "__WEAPP_APPID__",
+    "setting": { "urlCheck": false, "es6": true, "postcss": true, "minified": true },
+    "usingComponents": true,
+    "permission": { "scope.userLocation": { "desc": "用于显示驾校训练场地位置" } }
+  }
+}

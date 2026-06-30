@@ -1,0 +1,23 @@
+{
+  "school": {
+    "name": "{{school_name}}",
+    "shortName": "{{school_short_name}}",
+    "logo": "{{school_logo}}",
+    "phone": "{{school_phone}}",
+    "address": "{{school_address}}",
+    "description": "{{school_description}}",
+    "photos": [],
+    "theme": {
+      "primaryColor": "{{primary_color}}"
+    }
+  },
+  "courses": [],
+  "coaches": [],
+  "locations": [],
+  "features": {
+    "appointment": true,
+    "examPrep": true,
+    "onlinePayment": false,
+    "referral": false
+  }
+}
