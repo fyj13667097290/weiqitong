@@ -1,0 +1,94 @@
+name: 批量生成并部署小程序
+
+on:
+  workflow_dispatch:
+    inputs:
+      tenant_id:
+        description: '租户ID（留空则处理部署队列中所有待处理任务）'
+        required: false
+        default: ''
+  push:
+    branches: [master]
+    paths:
+      - 'templates/driving/code/**'
+      - 'templates/driving/schema.json'
+      - 'scripts/generate.js'
+
+jobs:
+  # 第一步：从管理后台拉取待部署的配置
+  fetch-configs:
+    runs-on: ubuntu-latest
+    outputs:
+      tasks: ${{ steps.fetch.outputs.tasks }}
+    steps:
+      - uses: actions/checkout@v3
+      - name: 获取待部署任务
+        id: fetch
+        run: |
+          TASKS=$(curl -s "${{ secrets.ADMIN_URL }}/api/tenants/${{ github.event.inputs.tenant_id || '' }}/config" || echo '[]')
+          echo "tasks=$TASKS" >> $GITHUB_OUTPUT
+
+  # 第二步：为每个驾校生成小程序代码
+  generate:
+    needs: fetch-configs
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        tenant: ${{ fromJson(needs.fetch-configs.outputs.tasks) }}
+      max-parallel: 3
+      fail-fast: false
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: 安装依赖
+        run: npm install -g yx-wechat-mini-cli
+
+      - name: 下载租户配置
+        run: |
+          mkdir -p configs dist
+          curl -s "${{ secrets.ADMIN_URL }}/api/tenants/${{ matrix.tenant }}/config" \
+            | python3 -c "import sys,json; d=json.load(sys.stdin); open(f'configs/\${{ matrix.tenant }}.json','w').write(json.dumps(d['config'],ensure_ascii=False))"
+
+      - name: 生成小程序代码
+        run: |
+          node scripts/generate.js "configs/${{ matrix.tenant }}.json" "dist/${{ matrix.tenant }}"
+
+      - name: 上传到微信
+        run: |
+          cat > "dist/${{ matrix.tenant }}/deploy-config.json" << YXEOF
+          {
+            "projects": [{
+              "name": "${{ matrix.tenant }}",
+              "appId": "${{ secrets[format('APPID_{0}', matrix.tenant)] }}",
+              "projectPath": "dist/${{ matrix.tenant }}",
+              "privateKeyPath": "keys/${{ matrix.tenant }}.key",
+              "version": "${{ github.run_number }}.0",
+              "description": "自动构建 #${{ github.run_number }}"
+            }]
+          }
+          YXEOF
+          mkdir -p keys
+          echo "${{ secrets[format('PRIVATE_KEY_{0}', matrix.tenant)] }}" > "keys/${{ matrix.tenant }}.key"
+          npx yx-wechat-mini-cli --config "dist/${{ matrix.tenant }}/deploy-config.json" --action upload --verbose
+
+      - name: 上报部署结果
+        if: always()
+        run: |
+          STATUS="${{ job.status }}"
+          curl -s -X POST "${{ secrets.ADMIN_URL }}/api/tenants/${{ matrix.tenant }}/deploy" \
+            -H "Content-Type: application/json" \
+            -d "{\"action\":\"upload\",\"result\":\"$STATUS\"}"
+
+      - name: 存档构建产物
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: build-${{ matrix.tenant }}
+          path: dist/${{ matrix.tenant }}
