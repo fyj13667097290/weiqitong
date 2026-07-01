@@ -2,13 +2,12 @@
 小程序工厂 - 管理后台 API v2
 多租户 + JSON配置驱动 + 行业模板可插拔
 """
-import sqlite3, json, uuid, os, base64, hashlib, struct, socket
+import sqlite3, json, uuid, os
 from datetime import date, datetime, timedelta
 from flask import Flask, request, jsonify, redirect, render_template_string, make_response
 import requests as _requests
 import time as _time
-import xml.etree.ElementTree as _ET
-from Crypto.Cipher import AES
+from wechatpy.crypto import WeChatCrypto
 
 app = Flask(__name__)
 DB = "/opt/jiaxiao/platform/admin/data.db"
@@ -20,21 +19,7 @@ WX_COMPONENT_SECRET = "56fd5df8a938e85447e2a8eb54bac7a1"
 WX_TOKEN = "weiqitong2026"
 WX_ENCODING_KEY = "FYJ3601211994062939321827089906115179196692"
 
-def wx_decrypt(encrypted, msg_signature, timestamp, nonce):
-    """解密微信推送的加密消息"""
-    try:
-        aes_key = base64.b64decode(WX_ENCODING_KEY + "=")
-        cipher = AES.new(aes_key, AES.MODE_CBC, aes_key[:16])
-        decrypted = cipher.decrypt(base64.b64decode(encrypted))
-        # 去掉padding
-        pad = decrypted[-1]
-        decrypted = decrypted[:-pad]
-        # 前16字节random，接下来4字节msg_len，后面是消息，最后是appid
-        content = decrypted[20:]
-        return content.decode("utf-8")
-    except Exception as e:
-        app.logger.error(f"WX_DECRYPT_ERROR: {e}")
-        return None
+WX_CRYPTO = WeChatCrypto(WX_TOKEN, WX_ENCODING_KEY, WX_COMPONENT_APPID)
 WX_TICKET_FILE = "/opt/jiaxiao/platform/admin/.wx_ticket"
 WX_ACCESS_TOKEN_FILE = "/opt/jiaxiao/platform/admin/.wx_access_token"
 
@@ -87,28 +72,24 @@ def wx_get_authorizer_info(authorizer_appid):
 
 @app.route("/wechat/callback", methods=["GET","POST"])
 def wechat_callback():
-    """接收微信推送: component_verify_ticket / 授权事件 / 审核结果"""
+    """接收微信推送"""
     if request.method == "GET":
         return request.args.get("echostr","")
     body = request.get_data(as_text=True)
     try:
-        xml = _ET.fromstring(body)
-        enc = xml.findtext("Encrypt")
-        if enc:
-            # 加密消息：先解密
-            sig = request.args.get("msg_signature","")
-            ts = request.args.get("timestamp","")
-            nonce = request.args.get("nonce","")
-            decrypted = wx_decrypt(enc, sig, ts, nonce)
-            if decrypted:
-                xml = _ET.fromstring(decrypted)
+        # 用wechatpy解密
+        sig = request.args.get("msg_signature","")
+        ts = request.args.get("timestamp","")
+        nonce = request.args.get("nonce","")
+        decrypted = WX_CRYPTO.decrypt_message(body, sig, ts, nonce)
+        # 用xml解析（import在函数内避免循环依赖）
+        import xml.etree.ElementTree as ET
+        xml = ET.fromstring(decrypted)
         info_type = xml.findtext("InfoType")
         if info_type == "component_verify_ticket":
             ticket = xml.findtext("ComponentVerifyTicket")
             if ticket:
                 wx_store(WX_TICKET_FILE, ticket)
-                app.logger.info(f"WX_TICKET_SAVED: {ticket[:20]}...")
-                # 清除旧token强制刷新
                 wx_store(WX_ACCESS_TOKEN_FILE, "")
         elif info_type == "authorized":
             # 授权成功
@@ -813,6 +794,13 @@ def api_trigger_github(tid):
         return jsonify({"ok": False, "message": str(e)}), 500
 
 # ==================== API: 健康检查 ====================
+
+@app.route("/debug/wx")
+def debug_wx():
+    """调试：查看微信票据状态"""
+    ticket = wx_get_stored(WX_TICKET_FILE) or "空"
+    token = wx_get_stored(WX_ACCESS_TOKEN_FILE) or "空"
+    return jsonify({"ticket":ticket[:50]+"..." if len(ticket)>50 else ticket, "token":token[:50]+"..." if len(token)>50 else token})
 
 @app.route("/api/health")
 def health():
