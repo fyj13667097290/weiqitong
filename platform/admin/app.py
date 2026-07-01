@@ -105,10 +105,10 @@ textarea{resize:vertical;min-height:80px}
 <div class="container">
 <a href="/admin" class="back">← 返回管理后台</a>
 <div class="tab-bar">
-  <div class="tab-item active" data-tab="tab-basic">基本信息</div>
-  <div class="tab-item" data-tab="tab-courses">课程套餐</div>
-  <div class="tab-item" data-tab="tab-coaches">教练团队</div>
-  <div class="tab-item" data-tab="tab-deploy">部署上线</div>
+  <div class="tab-item active" onclick="switchTab('tab-basic',this)">基本信息</div>
+  <div class="tab-item" onclick="switchTab('tab-courses',this)">课程套餐</div>
+  <div class="tab-item" onclick="switchTab('tab-coaches',this)">教练团队</div>
+  <div class="tab-item" onclick="switchTab('tab-deploy',this)">部署上线</div>
 </div>
 
 <form id="configForm">
@@ -174,18 +174,14 @@ function gv(id){ var el=document.getElementById(id); return el?el.value:''; }
 let cfg = {school:{name:gv('f_school_name'),shortName:gv('f_school_shortName'),logo:'',phone:gv('f_school_phone'),address:'',description:'',photos:[],theme:{primaryColor:'#1890ff'}},courses:[],coaches:[],locations:[],features:{appointment:true,examPrep:true,onlinePayment:false}};
 
 // === TAB ===
-(function initTabs(){
-  document.querySelectorAll('.tab-item').forEach(function(t){
-    t.onclick = function(){
-      document.querySelectorAll('.tab-item').forEach(function(e){e.classList.remove('active')});
-      document.querySelectorAll('.tab-content').forEach(function(e){e.classList.remove('active')});
-      t.classList.add('active');
-      var el = document.getElementById(t.dataset.tab);
-      if(el){ el.classList.add('active'); if(t.dataset.tab==='tab-deploy') loadDeployments(); }
-    };
-  });
-  load();
-})();
+function switchTab(tabId, el){
+  document.querySelectorAll('.tab-item').forEach(function(e){e.classList.remove('active')});
+  document.querySelectorAll('.tab-content').forEach(function(e){e.classList.remove('active')});
+  el.classList.add('active');
+  var tab = document.getElementById(tabId);
+  if(tab){ tab.classList.add('active'); if(tabId==='tab-deploy') loadDeployments(); }
+}
+load();
 
 // === LOAD ===
 async function load(){
