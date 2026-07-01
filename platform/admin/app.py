@@ -440,6 +440,12 @@ def api_get_config(tid):
         "school": {"name":"","shortName":"","logo":"","phone":"","address":"","description":"","photos":[],"theme":{"primaryColor":"#1890ff"}},
         "courses": [], "coaches": [], "locations": [], "features": {"appointment":True,"examPrep":True,"onlinePayment":False}
     }
+    # 没有配置时，从租户信息预填充
+    tenant = d.execute("SELECT * FROM tenants WHERE id=?", [tid]).fetchone()
+    if tenant:
+        default["school"]["name"] = tenant["name"] or ""
+        default["school"]["shortName"] = tenant["short_name"] or ""
+        default["school"]["phone"] = tenant["contact_phone"] or ""
     d.close()
     return jsonify({"tenant_id":tid, "version":0, "config":default, "status":"draft"})
 
