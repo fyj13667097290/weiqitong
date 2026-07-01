@@ -371,7 +371,7 @@ th{color:#999;font-weight:500;font-size:13px;background:#fafafa}
 <td><span class="badge {% if t.status=='active' %}badge-active{% else %}badge-trial{% endif %}">{{t.status}}</span></td>
 <td><span class="badge {% if t.deploy_status=='success' %}badge-active{% elif t.deploy_status=='failed' %}badge-trial{% else %}badge-draft{% endif %}">{{t.deploy_status or '未部署'}}</span></td>
 <td>{{t.created_at[:10] if t.created_at else '-'}}</td>
-<td><a href="/tenants/{{t.id}}/config" class="btn btn-primary btn-sm">配置</a> <a href="#" onclick="delTenant('{{t.id}}','{{t.name}}')" class="btn btn-sm" style="background:#ff4d4f;color:#fff;font-size:11px;padding:3px 8px;text-decoration:none;border-radius:3px">删除</a></td>
+<td><a href="/tenants/{{t.id}}/config" class="btn btn-primary btn-sm">配置</a> <a href="/school/{{t.id}}/login" target="_blank" class="btn btn-sm" style="background:#52c41a;color:#fff;font-size:11px;padding:3px 8px;text-decoration:none;border-radius:3px">自助后台</a> <a href="#" onclick="delTenant('{{t.id}}','{{t.name}}')" class="btn btn-sm" style="background:#ff4d4f;color:#fff;font-size:11px;padding:3px 8px;text-decoration:none;border-radius:3px">删除</a></td>
 </tr>{% endfor %}{% else %}<tr><td colspan="7" class="empty">还没有客户，点击右上角添加</td></tr>{% endif %}</tbody></table>
 </div></div>
 <script>
