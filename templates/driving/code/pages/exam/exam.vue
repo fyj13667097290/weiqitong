@@ -48,7 +48,7 @@
         </view>
         <view class="nav-btns">
           <button class="btn" @tap="examCurrent=Math.max(0,examCurrent-1)" :disabled="examCurrent===0">上一题</button>
-          <button class="btn primary" :style="{background:theme.primaryColor}" @tap="examCurrent=Math.min(examList.length-1,examCurrent+1)">{{examCurrent<examList.length-1?'下一题':'返回首题'}}</button>
+          <button class="btn primary" :style="{background:theme.primaryColor}" @tap="examCurrent=Math.min(examList.length-1,examCurrent+1)">{{examNextBtnText}}</button>
         </view>
       </view>
     </view>
@@ -74,7 +74,8 @@ export default {
   data() { return { theme:config.school.theme, mode:'practice', questions:[], currentQ:0, answered:false, userAnswer:null, correctAnswer:null, correctExplain:'', wrongList:[], examList:[], examCurrent:0, examAnswers:[], examTime:'45:00', examTimer:null, loading:true }; },
   computed: {
     nextBtnText(){ return this.currentQ<this.questions.length-1?'下一题':'完成'; },
-    answeredCount(){ return this.examAnswers.filter(Boolean).length; }
+    answeredCount(){ return this.examAnswers.filter(Boolean).length; },
+    examNextBtnText(){ return this.examCurrent<this.examList.length-1?'下一题':'返回首题'; }
   },
   onLoad(){ this.fetchQuestions(); },
   methods: {
