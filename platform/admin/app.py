@@ -122,6 +122,28 @@ def wechat_callback():
             d = db()
             d.execute("DELETE FROM wechat_auths WHERE authorizer_appid=?", [authorizer_appid])
             d.commit(); d.close()
+        elif info_type == "notify_third_fastregisterweapp":
+            # 快速注册小程序成功回调，自动拿到AppID
+            appid = xml.findtext("appid")
+            status = xml.findtext("status")
+            legal_name = xml.findtext("info/name") or ""
+            if appid and status == "0":
+                d2 = db()
+                # 用法人姓名匹配租户
+                tenant = d2.execute("SELECT id FROM tenants WHERE contact_name=? AND status!='inactive' ORDER BY created_at DESC LIMIT 1", [legal_name]).fetchone()
+                if tenant:
+                    latest = d2.execute("SELECT * FROM configs WHERE tenant_id=? ORDER BY version DESC LIMIT 1", [tenant["id"]]).fetchone()
+                    if latest:
+                        cfg = json.loads(latest["config"])
+                        cfg["school"]["appId"] = appid
+                        new_ver = latest["version"] + 1
+                        d2.execute("INSERT INTO configs (tenant_id,version,config,status,mini_appid) VALUES (?,?,?,?,?)",
+                                  [tenant["id"], new_ver, json.dumps(cfg, ensure_ascii=False), "draft", appid])
+                    # 自动授权
+                    d2.execute("INSERT OR REPLACE INTO wechat_auths (tenant_id,authorizer_appid,authorized_at) VALUES (?,?,datetime('now'))",
+                              [tenant["id"], appid])
+                    d2.commit()
+                d2.close()
         elif info_type == "weapp_audit_success":
             appid = xml.findtext("ToAppid")
             app.logger.info(f"WX_AUDIT_SUCCESS: {appid}")
