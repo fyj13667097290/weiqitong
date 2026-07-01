@@ -81,7 +81,12 @@ const walkDir = (dir) => {
 
 walkDir(outputDir);
 
-// 5. 写入完整 school.config.json（替换掉占位符模板）
+// 5. 注入_meta信息（租户ID、API地址）
+config._meta = config._meta || {};
+config._meta.tenantId = config._meta.tenantId || path.basename(outputDir);
+config._meta.apiBase = config._meta.apiBase || 'https://jiaxiao.t-hub.cc';
+
+// 6. 写入完整 school.config.json
 const configDest = path.join(outputDir, 'school.config.json');
 fs.writeFileSync(configDest, JSON.stringify(config, null, 2), 'utf-8');
 
