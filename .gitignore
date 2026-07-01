@@ -9,3 +9,6 @@ node_modules/
 *.log
 .github_token
 .admin_password
+.wx_ticket
+.wx_access_token
+wx_auth_map/
