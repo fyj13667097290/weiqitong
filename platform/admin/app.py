@@ -524,6 +524,7 @@ th{color:#999;font-weight:500;font-size:13px;background:#fafafa}
   <a href="#" onclick="hardDelTenant('{{t.id}}','{{t.name}}')" class="btn btn-sm" style="background:#ff4d4f;color:#fff;font-size:11px;padding:3px 8px;text-decoration:none;border-radius:3px">彻底删除</a>
 {% else %}
   <a href="/tenants/{{t.id}}/config" class="btn btn-primary btn-sm">配置</a>
+  <a href="#" onclick="authWx('{{t.id}}')" class="btn btn-sm" style="background:#722ed1;color:#fff;font-size:11px;padding:3px 8px;text-decoration:none;border-radius:3px">授权</a>
   <a href="/school/{{t.id}}/impersonate" class="btn btn-sm" style="background:#fa8c16;color:#fff;font-size:11px;padding:3px 8px;text-decoration:none;border-radius:3px">管理</a>
   <a href="/school/{{t.id}}/login" target="_blank" class="btn btn-sm" style="background:#52c41a;color:#fff;font-size:11px;padding:3px 8px;text-decoration:none;border-radius:3px">自助后台</a>
   <a href="#" onclick="copyLink('{{t.id}}')" class="btn btn-sm" style="background:#1890ff;color:#fff;font-size:11px;padding:3px 8px;text-decoration:none;border-radius:3px">复制链接</a>
@@ -536,6 +537,12 @@ function delTenant(id,name){
   if(!confirm('确定要删除客户「'+name+'」吗？\\n此操作不可恢复。')) return;
   fetch('/api/tenants/'+id,{method:'DELETE'}).then(function(r){ return r.json(); }).then(function(d){
     if(d.ok){ alert('已删除'); location.reload(); } else { alert('删除失败'); }
+  });
+}
+function authWx(id){
+  fetch('/api/wechat/auth-url/'+id).then(function(r){return r.json()}).then(function(d){
+    if(d.url) prompt('复制此链接发给客户，在微信中打开授权：', d.url);
+    else alert('获取失败，请稍后重试');
   });
 }
 function copyLink(id){
@@ -762,16 +769,17 @@ def api_deploy(tid):
         result = "failed"
         message = f"生成失败: {str(e)}"
 
-    # 2. 如果有微信授权，上传代码
+    # 2. 如果有微信授权，通过模板上传代码
     if result == "generated" and action == "upload":
         auth = d.execute("SELECT * FROM wechat_auths WHERE tenant_id=?", [tid]).fetchone()
         if auth:
             try:
                 token = auth["authorizer_access_token"]
-                ext_json = json.dumps({"extEnable":True,"extAppid":auth["authorizer_appid"],"directCommit":False}, ensure_ascii=False)
+                # 用ext_json方式直接提交（不需要预存模板）
+                ext = {"extEnable": True, "extAppid": auth["authorizer_appid"], "directCommit": True}
                 resp = _requests.post(f"https://api.weixin.qq.com/wxa/commit?access_token={token}", json={
                     "template_id": 0,
-                    "ext_json": ext_json,
+                    "ext_json": json.dumps(ext, ensure_ascii=False),
                     "user_version": f"v{config['version']}",
                     "user_desc": "小程序工厂自动部署 v"+str(config['version'])
                 }, timeout=30).json()
@@ -779,8 +787,12 @@ def api_deploy(tid):
                     result = "uploaded"
                     message = "代码已上传到微信"
                 else:
+                    # 如果模板不存在，需要先创建模板
+                    if "template not exist" in str(resp.get("errmsg","")):
+                        message = "需要在微信开发者工具中先上传一次代码建立模板，之后即可自动部署"
+                    else:
+                        message = resp.get("errmsg", "上传失败")
                     result = "upload_failed"
-                    message = resp.get("errmsg", "上传失败")
             except Exception as e:
                 result = "upload_failed"
                 message = str(e)
