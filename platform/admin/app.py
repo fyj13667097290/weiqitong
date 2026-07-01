@@ -116,9 +116,9 @@ textarea{resize:vertical;min-height:80px}
 <div class="tab-content active" id="tab-basic">
   <div class="card">
     <h3>驾校信息</h3>
-    <div class="row"><div class="form-group"><label>驾校全称 *</label><input id="f_school_name" required></div>
-    <div class="form-group"><label>简称</label><input id="f_school_shortName"></div></div>
-    <div class="row"><div class="form-group"><label>联系电话 *</label><input id="f_school_phone" required></div>
+    <div class="row"><div class="form-group"><label>驾校全称 *</label><input id="f_school_name" required value="{{tenant.name}}"></div>
+    <div class="form-group"><label>简称</label><input id="f_school_shortName" value="{{tenant.short_name or ''}}"></div></div>
+    <div class="row"><div class="form-group"><label>联系电话 *</label><input id="f_school_phone" required value="{{tenant.contact_phone or ''}}"></div>
     <div class="form-group"><label>Logo URL</label><input id="f_school_logo" placeholder="https://..."></div></div>
     <div class="form-group"><label>地址</label><input id="f_school_address"></div>
     <div class="form-group"><label>驾校简介</label><textarea id="f_school_description" maxlength="500"></textarea></div>
@@ -169,7 +169,8 @@ textarea{resize:vertical;min-height:80px}
 
 <script>
 const tid = window.location.pathname.split('/')[2];
-let cfg = {school:{name:'',shortName:'',logo:'',phone:'',address:'',description:'',photos:[],theme:{primaryColor:'#1890ff'}},courses:[],coaches:[],locations:[],features:{appointment:true,examPrep:true,onlinePayment:false}};
+// 先用服务端渲染的值，API加载后再覆盖
+let cfg = {school:{name:document.getElementById('f_school_name').value,shortName:document.getElementById('f_school_shortName').value,logo:'',phone:document.getElementById('f_school_phone').value,address:'',description:'',photos:[],theme:{primaryColor:'#1890ff'}},courses:[],coaches:[],locations:[],features:{appointment:true,examPrep:true,onlinePayment:false}};
 
 // === TAB ===
 (function initTabs(){
