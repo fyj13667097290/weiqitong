@@ -7,12 +7,6 @@ on:
         description: '租户ID（留空则处理部署队列中所有待处理任务）'
         required: false
         default: ''
-  push:
-    branches: [master]
-    paths:
-      - 'templates/driving/code/**'
-      - 'templates/driving/schema.json'
-      - 'scripts/generate.js'
 
 jobs:
   # 第一步：从管理后台拉取待部署的配置

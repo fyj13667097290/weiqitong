@@ -4,7 +4,7 @@
 """
 import sqlite3, json, uuid, os
 from datetime import date, datetime, timedelta
-from flask import Flask, request, jsonify, render_template_string
+from flask import Flask, request, jsonify, redirect, render_template_string
 
 app = Flask(__name__)
 DB = "/opt/jiaxiao/platform/admin/data.db"
