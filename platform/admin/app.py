@@ -454,6 +454,13 @@ input{width:100%;padding:12px;border:1px solid #d9d9d9;border-radius:8px;font-si
 {% if error %}<p class="err">{{error}}</p>{% endif %}
 <button class="btn" type="submit">登录</button></form></div></body></html>"""
 
+@app.route("/clear", methods=["GET"])
+def clear_cookies():
+    resp = redirect("/login")
+    resp.delete_cookie("admin_token")
+    resp.delete_cookie("school_admin")
+    return resp
+
 @app.route("/login", methods=["GET","POST"])
 def admin_login():
     error = None
