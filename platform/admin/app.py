@@ -759,7 +759,7 @@ def customer_login(tid):
 
 @app.route("/school/<tid>/dashboard")
 def customer_dashboard(tid):
-    if request.cookies.get("school_admin") != tid:
+    if (request.cookies.get("school_admin") != tid and request.cookies.get("admin_token") != get_admin_pw()):
         return redirect(f"/school/{tid}/login")
     d = db()
     t = d.execute("SELECT * FROM tenants WHERE id=?", [tid]).fetchone()
@@ -772,7 +772,7 @@ def customer_dashboard(tid):
 
 @app.route("/school/<tid>/announcement/new", methods=["GET","POST"])
 def customer_announcement_new(tid):
-    if request.cookies.get("school_admin") != tid: return redirect(f"/school/{tid}/login")
+    if (request.cookies.get("school_admin") != tid and request.cookies.get("admin_token") != get_admin_pw()): return redirect(f"/school/{tid}/login")
     if request.method == "POST":
         d = db()
         d.execute("INSERT INTO announcements (tenant_id,title,content) VALUES (?,?,?)", [tid, request.form["title"], request.form.get("content","")])
@@ -790,13 +790,13 @@ textarea{{resize:vertical;min-height:100px}}
 
 @app.route("/school/<tid>/announcement/<int:aid>/delete")
 def customer_announcement_delete(tid, aid):
-    if request.cookies.get("school_admin") != tid: return redirect(f"/school/{tid}/login")
+    if (request.cookies.get("school_admin") != tid and request.cookies.get("admin_token") != get_admin_pw()): return redirect(f"/school/{tid}/login")
     d = db(); d.execute("DELETE FROM announcements WHERE id=? AND tenant_id=?", [aid, tid]); d.commit(); d.close()
     return redirect(f"/school/{tid}/dashboard")
 
 @app.route("/school/<tid>/course/new", methods=["GET","POST"])
 def customer_course_new(tid):
-    if request.cookies.get("school_admin") != tid: return redirect(f"/school/{tid}/login")
+    if (request.cookies.get("school_admin") != tid and request.cookies.get("admin_token") != get_admin_pw()): return redirect(f"/school/{tid}/login")
     if request.method == "POST":
         d = db()
         d.execute("INSERT INTO dynamic_courses (tenant_id,name,price,original_price,features,tag) VALUES (?,?,?,?,?,?)",
@@ -816,13 +816,13 @@ h3{{margin-bottom:16px}} input{{width:100%;padding:10px;border:1px solid #d9d9d9
 
 @app.route("/school/<tid>/course/<int:cid>/delete")
 def customer_course_delete(tid, cid):
-    if request.cookies.get("school_admin") != tid: return redirect(f"/school/{tid}/login")
+    if (request.cookies.get("school_admin") != tid and request.cookies.get("admin_token") != get_admin_pw()): return redirect(f"/school/{tid}/login")
     d = db(); d.execute("DELETE FROM dynamic_courses WHERE id=? AND tenant_id=?", [cid, tid]); d.commit(); d.close()
     return redirect(f"/school/{tid}/dashboard")
 
 @app.route("/school/<tid>/coach/new", methods=["GET","POST"])
 def customer_coach_new(tid):
-    if request.cookies.get("school_admin") != tid: return redirect(f"/school/{tid}/login")
+    if (request.cookies.get("school_admin") != tid and request.cookies.get("admin_token") != get_admin_pw()): return redirect(f"/school/{tid}/login")
     if request.method == "POST":
         d = db()
         d.execute("INSERT INTO dynamic_coaches (tenant_id,name,experience,pass_rate,rating,tags,phone) VALUES (?,?,?,?,?,?,?)",
@@ -843,13 +843,13 @@ h3{{margin-bottom:16px}} input{{width:100%;padding:10px;border:1px solid #d9d9d9
 
 @app.route("/school/<tid>/coach/<int:cid>/delete")
 def customer_coach_delete(tid, cid):
-    if request.cookies.get("school_admin") != tid: return redirect(f"/school/{tid}/login")
+    if (request.cookies.get("school_admin") != tid and request.cookies.get("admin_token") != get_admin_pw()): return redirect(f"/school/{tid}/login")
     d = db(); d.execute("DELETE FROM dynamic_coaches WHERE id=? AND tenant_id=?", [cid, tid]); d.commit(); d.close()
     return redirect(f"/school/{tid}/dashboard")
 
 @app.route("/school/<tid>/password", methods=["GET","POST"])
 def customer_password(tid):
-    if request.cookies.get("school_admin") != tid: return redirect(f"/school/{tid}/login")
+    if (request.cookies.get("school_admin") != tid and request.cookies.get("admin_token") != get_admin_pw()): return redirect(f"/school/{tid}/login")
     d = db(); msg = ""
     if request.method == "POST":
         old = request.form.get("old",""); new = request.form.get("new","")
@@ -909,7 +909,7 @@ def api_public_coaches(tid):
 
 @app.route("/school/<tid>/referrers")
 def customer_referrers(tid):
-    if request.cookies.get("school_admin") != tid: return redirect(f"/school/{tid}/login")
+    if (request.cookies.get("school_admin") != tid and request.cookies.get("admin_token") != get_admin_pw()): return redirect(f"/school/{tid}/login")
     d = db()
     t = d.execute("SELECT * FROM tenants WHERE id=?", [tid]).fetchone()
     referrers = d.execute("SELECT r.*, (SELECT COUNT(*) FROM referrals rf WHERE rf.referrer_id=r.id) as ref_count FROM referrers r WHERE r.tenant_id=? AND r.is_active=1 ORDER BY r.created_at DESC", [tid]).fetchall()
@@ -972,7 +972,7 @@ th{color:#999;font-weight:500}.empty{text-align:center;color:#bbb;padding:20px}
 
 @app.route("/school/<tid>/referrer/new", methods=["POST"])
 def customer_referrer_new(tid):
-    if request.cookies.get("school_admin") != tid: return redirect(f"/school/{tid}/login")
+    if (request.cookies.get("school_admin") != tid and request.cookies.get("admin_token") != get_admin_pw()): return redirect(f"/school/{tid}/login")
     d = db()
     d.execute("INSERT INTO referrers (tenant_id,name,phone,code,commission_rate) VALUES (?,?,?,?,?)",
               [tid, request.form["name"], request.form.get("phone",""), request.form["code"], float(request.form.get("commission_rate",0) or 0)])
@@ -981,7 +981,7 @@ def customer_referrer_new(tid):
 
 @app.route("/school/<tid>/referrer/<int:rid>/delete")
 def customer_referrer_delete(tid, rid):
-    if request.cookies.get("school_admin") != tid: return redirect(f"/school/{tid}/login")
+    if (request.cookies.get("school_admin") != tid and request.cookies.get("admin_token") != get_admin_pw()): return redirect(f"/school/{tid}/login")
     d = db(); d.execute("UPDATE referrers SET is_active=0 WHERE id=? AND tenant_id=?", [rid, tid]); d.commit(); d.close()
     return redirect(f"/school/{tid}/referrers")
 
@@ -1000,13 +1000,13 @@ def api_referral(tid):
 
 @app.route("/school/<tid>/appointment/<int:aid>/confirm")
 def customer_appointment_confirm(tid, aid):
-    if request.cookies.get("school_admin") != tid: return redirect(f"/school/{tid}/login")
+    if (request.cookies.get("school_admin") != tid and request.cookies.get("admin_token") != get_admin_pw()): return redirect(f"/school/{tid}/login")
     d = db(); d.execute("UPDATE appointments SET status='confirmed' WHERE id=? AND tenant_id=?", [aid, tid]); d.commit(); d.close()
     return redirect(f"/school/{tid}/dashboard")
 
 @app.route("/school/<tid>/appointment/<int:aid>/complete")
 def customer_appointment_complete(tid, aid):
-    if request.cookies.get("school_admin") != tid: return redirect(f"/school/{tid}/login")
+    if (request.cookies.get("school_admin") != tid and request.cookies.get("admin_token") != get_admin_pw()): return redirect(f"/school/{tid}/login")
     d = db(); d.execute("UPDATE appointments SET status='completed' WHERE id=? AND tenant_id=?", [aid, tid]); d.commit(); d.close()
     return redirect(f"/school/{tid}/dashboard")
 
