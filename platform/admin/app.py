@@ -169,8 +169,9 @@ textarea{resize:vertical;min-height:80px}
 
 <script>
 const tid = window.location.pathname.split('/')[2];
-// 先用服务端渲染的值，API加载后再覆盖
-let cfg = {school:{name:document.getElementById('f_school_name').value,shortName:document.getElementById('f_school_shortName').value,logo:'',phone:document.getElementById('f_school_phone').value,address:'',description:'',photos:[],theme:{primaryColor:'#1890ff'}},courses:[],coaches:[],locations:[],features:{appointment:true,examPrep:true,onlinePayment:false}};
+// 安全读取服务端预填值
+function gv(id){ var el=document.getElementById(id); return el?el.value:''; }
+let cfg = {school:{name:gv('f_school_name'),shortName:gv('f_school_shortName'),logo:'',phone:gv('f_school_phone'),address:'',description:'',photos:[],theme:{primaryColor:'#1890ff'}},courses:[],coaches:[],locations:[],features:{appointment:true,examPrep:true,onlinePayment:false}};
 
 // === TAB ===
 (function initTabs(){
