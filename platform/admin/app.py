@@ -371,7 +371,7 @@ th{color:#999;font-weight:500;font-size:13px;background:#fafafa}
 <td><span class="badge {% if t.status=='active' %}badge-active{% else %}badge-trial{% endif %}">{{t.status}}</span></td>
 <td><span class="badge {% if t.deploy_status=='success' %}badge-active{% elif t.deploy_status=='failed' %}badge-trial{% else %}badge-draft{% endif %}">{{t.deploy_status or '未部署'}}</span></td>
 <td>{{t.created_at[:10] if t.created_at else '-'}}</td>
-<td><a href="/tenants/{{t.id}}/config" class="btn btn-primary btn-sm">配置</a> <a href="/school/{{t.id}}/login" target="_blank" class="btn btn-sm" style="background:#52c41a;color:#fff;font-size:11px;padding:3px 8px;text-decoration:none;border-radius:3px">自助后台</a> <a href="#" onclick="delTenant('{{t.id}}','{{t.name}}')" class="btn btn-sm" style="background:#ff4d4f;color:#fff;font-size:11px;padding:3px 8px;text-decoration:none;border-radius:3px">删除</a></td>
+<td><a href="/tenants/{{t.id}}/config" class="btn btn-primary btn-sm">配置</a> <a href="/school/{{t.id}}/login" target="_blank" class="btn btn-sm" style="background:#52c41a;color:#fff;font-size:11px;padding:3px 8px;text-decoration:none;border-radius:3px">自助后台</a> <a href="#" onclick="copyLink('{{t.id}}')" class="btn btn-sm" style="background:#1890ff;color:#fff;font-size:11px;padding:3px 8px;text-decoration:none;border-radius:3px">复制链接</a> <a href="#" onclick="delTenant('{{t.id}}','{{t.name}}')" class="btn btn-sm" style="background:#ff4d4f;color:#fff;font-size:11px;padding:3px 8px;text-decoration:none;border-radius:3px">删除</a></td>
 </tr>{% endfor %}{% else %}<tr><td colspan="7" class="empty">还没有客户，点击右上角添加</td></tr>{% endif %}</tbody></table>
 </div></div>
 <script>
@@ -380,6 +380,14 @@ function delTenant(id,name){
   fetch('/api/tenants/'+id,{method:'DELETE'}).then(function(r){ return r.json(); }).then(function(d){
     if(d.ok){ alert('已删除'); location.reload(); } else { alert('删除失败'); }
   });
+}
+function copyLink(id){
+  var url = 'https://jiaxiao.t-hub.cc/school/'+id+'/login';
+  var ta = document.createElement('textarea');
+  ta.value = url; ta.style.position = 'fixed'; ta.style.left = '-9999px';
+  document.body.appendChild(ta); ta.select();
+  try { document.execCommand('copy'); alert('已复制！\\n'+url); } catch(e) { prompt('手动复制', url); }
+  document.body.removeChild(ta);
 }
 </script></body></html>"""
 
@@ -592,7 +600,7 @@ table{width:100%;border-collapse:collapse;font-size:13px} th,td{padding:8px 12px
 th{color:#999;font-weight:500}.empty{text-align:center;color:#bbb;padding:20px}
 .btn-sm{font-size:11px;padding:3px 8px;border-radius:3px;border:none;cursor:pointer;text-decoration:none;color:#fff;display:inline-block}
 .btn-del{background:#ff4d4f}</style></head><body>
-<div class="header"><h2>🏫 {{tenant.name}}</h2><a href="/school/{{tenant.id}}/login">退出</a></div>
+<div class="header"><h2>🏫 {{tenant.name}}</h2><div><a href="/school/{{tenant.id}}/password" style="color:#94a3b8;text-decoration:none;font-size:13px;margin-right:16px">修改密码</a><a href="/school/{{tenant.id}}/login">退出</a></div></div>
 <div class="container">
 
 <div class="card"><h3>📢 公告 <a href="/school/{{tenant.id}}/announcement/new">+ 发布</a></h3>
@@ -729,6 +737,32 @@ def customer_coach_delete(tid, cid):
     if request.cookies.get("school_admin") != tid: return redirect(f"/school/{tid}/login")
     d = db(); d.execute("DELETE FROM dynamic_coaches WHERE id=? AND tenant_id=?", [cid, tid]); d.commit(); d.close()
     return redirect(f"/school/{tid}/dashboard")
+
+@app.route("/school/<tid>/password", methods=["GET","POST"])
+def customer_password(tid):
+    if request.cookies.get("school_admin") != tid: return redirect(f"/school/{tid}/login")
+    d = db(); msg = ""
+    if request.method == "POST":
+        old = request.form.get("old",""); new = request.form.get("new","")
+        admin = d.execute("SELECT * FROM customer_admins WHERE tenant_id=?", [tid]).fetchone()
+        if not admin or old != admin["password"]: msg = "原密码错误"
+        elif len(new) < 4: msg = "新密码至少4位"
+        else:
+            d.execute("UPDATE customer_admins SET password=? WHERE tenant_id=?", [new, tid]); d.commit()
+            msg = "密码修改成功"
+    d.close()
+    color = '#ff4d4f' if '错误' in msg else '#52c41a'
+    return f"""<!DOCTYPE html><html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>修改密码</title>
+<style>*{{margin:0;padding:0}}body{{font-family:-apple-system,sans-serif;background:#f0f2f5;padding:20px}}.card{{background:#fff;max-width:400px;margin:60px auto;padding:30px;border-radius:8px;text-align:center}}
+h3{{margin-bottom:20px}}input{{width:100%;padding:10px;border:1px solid #d9d9d9;border-radius:4px;font-size:14px;margin-bottom:12px;text-align:center}}
+.btn{{width:100%;padding:10px;background:#667eea;color:#fff;border:none;border-radius:4px;cursor:pointer;font-weight:600;font-size:14px}}
+.msg{{color:{color};font-size:13px;margin-bottom:12px}}
+</style></head><body><div class="card"><h3>🔒 修改管理密码</h3>
+<form method="POST"><input type="password" name="old" placeholder="原密码" required><input type="password" name="new" placeholder="新密码（至少4位）" required>
+<button class="btn" type="submit">确认修改</button></form>
+<p class="msg">{msg or ''}</p>
+<a href="/school/{tid}/dashboard" style="font-size:13px;color:#999;text-decoration:none">← 返回</a>
+</div></body></html>"""
 
 # 公开API：小程序端读取动态内容
 @app.route("/api/public/<tid>/announcements")
