@@ -727,8 +727,9 @@ th{color:#999;font-weight:500}.empty{text-align:center;color:#bbb;padding:20px}
 <p style="font-size:13px;color:#666">管理招生老师账号，查看各渠道推荐数据</p></div>
 
 <div class="card"><h3>📋 最近预约</h3>
-{% if appointments %}<table><tr><th>学员</th><th>电话</th><th>课程</th><th>时间</th><th>状态</th></tr>
-{% for a in appointments %}<tr><td>{{a.student_name}}</td><td>{{a.student_phone}}</td><td>{{a.course_type}}</td><td>{{a.appointment_time}}</td><td>{{a.status}}</td></tr>{% endfor %}</table>
+{% if appointments %}<table><tr><th>学员</th><th>电话</th><th>课程</th><th>时间</th><th>状态</th><th>操作</th></tr>
+{% for a in appointments %}<tr><td>{{a.student_name}}</td><td>{{a.student_phone}}</td><td>{{a.course_type}}</td><td>{{a.appointment_time}}</td><td><span class="tag tag-{{a.status}}">{{a.status}}</span></td>
+<td>{% if a.status=='pending' %}<a class="btn-sm" style="background:#52c41a;color:#fff" href="/school/{{tenant.id}}/appointment/{{a.id}}/confirm">确认</a>{% elif a.status=='confirmed' %}<a class="btn-sm" style="background:#1890ff;color:#fff" href="/school/{{tenant.id}}/appointment/{{a.id}}/complete">完成</a>{% endif %}</td></tr>{% endfor %}</table>
 {% else %}<p class="empty">暂无预约</p>{% endif %}</div>
 
 </div></body></html>"""
@@ -996,6 +997,43 @@ def api_referral(tid):
               [tid, ref["id"] if ref else None, code, data.get("student_name",""), data.get("student_phone",""), data.get("source","mini_program")])
     d.commit(); d.close()
     return jsonify({"ok":True, "referrer": ref["id"] if ref else None})
+
+@app.route("/school/<tid>/appointment/<int:aid>/confirm")
+def customer_appointment_confirm(tid, aid):
+    if request.cookies.get("school_admin") != tid: return redirect(f"/school/{tid}/login")
+    d = db(); d.execute("UPDATE appointments SET status='confirmed' WHERE id=? AND tenant_id=?", [aid, tid]); d.commit(); d.close()
+    return redirect(f"/school/{tid}/dashboard")
+
+@app.route("/school/<tid>/appointment/<int:aid>/complete")
+def customer_appointment_complete(tid, aid):
+    if request.cookies.get("school_admin") != tid: return redirect(f"/school/{tid}/login")
+    d = db(); d.execute("UPDATE appointments SET status='completed' WHERE id=? AND tenant_id=?", [aid, tid]); d.commit(); d.close()
+    return redirect(f"/school/{tid}/dashboard")
+
+# ==================== 预约 API ====================
+
+@app.route("/api/public/<tid>/appointments", methods=["POST"])
+def api_create_appointment(tid):
+    data = request.get_json()
+    d = db()
+    d.execute("INSERT INTO appointments (tenant_id,student_name,student_phone,coach_name,course_type,appointment_time,status) VALUES (?,?,?,?,?,?,?)",
+              [tid, data["student_name"], data.get("student_phone",""), data.get("coach_name",""), data.get("course_type",""), data.get("appointment_time",""), "pending"])
+    d.commit(); d.close()
+    return jsonify({"ok":True, "message":"预约已提交"})
+
+@app.route("/api/public/<tid>/coach-slots")
+def api_coach_slots(tid):
+    """返回可预约时段（简化版：固定时段+查询已约）"""
+    import time as _time
+    slots = []
+    for day_offset in range(7):
+        t = _time.time() + day_offset * 86400
+        date_str = _time.strftime("%m月%d日", _time.localtime(t))
+        weekdays = ["日","一","二","三","四","五","六"]
+        for h in [8,10,14,16,18]:
+            label = f"{h:02d}:00-{h+1:02d}:30"
+            slots.append({"date":date_str,"weekday":weekdays[_time.localtime(t).tm_wday],"time":label,"full":False,"remain":3})
+    return jsonify(slots)
 
 # ==================== 题库 API ====================
 
