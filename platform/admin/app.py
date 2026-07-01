@@ -948,6 +948,9 @@ th{color:#999;font-weight:500}.empty{text-align:center;color:#bbb;padding:20px}
 {% for c in coaches %}<tr><td>{{c.name}}</td><td>{{c.experience}}年</td><td>{{c.rating or '-'}}</td><td><a class="btn-sm btn-del" href="/school/{{tenant.id}}/coach/{{c.id}}/delete" onclick="return confirm('确定删除？')">删除</a></td></tr>{% endfor %}</table>
 {% else %}<p class="empty">暂无教练</p>{% endif %}</div>
 
+<div class="card"><h3>⚙️ 预约设置 <a href="/school/{{tenant.id}}/appointment-settings">管理</a></h3>
+<p style="font-size:13px;color:#666">设可约时段、人数上限、开关预约</p></div>
+
 <div class="card"><h3>👥 招生老师 <a href="/school/{{tenant.id}}/referrers">管理</a></h3>
 <p style="font-size:13px;color:#666">管理招生老师账号，查看各渠道推荐数据</p></div>
 
@@ -1429,6 +1432,59 @@ def customer_appointment_complete(tid, aid):
     if (request.cookies.get("school_admin") != tid and request.cookies.get("admin_token") != get_admin_pw()): return redirect(f"/school/{tid}/login")
     d = db(); d.execute("UPDATE appointments SET status='completed' WHERE id=? AND tenant_id=?", [aid, tid]); d.commit(); d.close()
     return redirect(f"/school/{tid}/dashboard")
+
+# ==================== 预约设置 ====================
+
+@app.route("/school/<tid>/appointment-settings", methods=["GET","POST"])
+def customer_appointment_settings(tid):
+    if request.cookies.get("school_admin") != tid and request.cookies.get("admin_token") != get_admin_pw():
+        return redirect(f"/school/{tid}/login")
+    d = db()
+    t = d.execute("SELECT * FROM tenants WHERE id=?", [tid]).fetchone()
+    if request.method == "POST":
+        d.execute("INSERT OR REPLACE INTO appointment_settings (tenant_id,advance_days,time_slots,capacity,is_open) VALUES (?,?,?,?,?)",
+                  [tid, int(request.form.get("advance_days",7)), request.form.get("time_slots",'["08:00-10:00","10:00-12:00","14:00-16:00","16:00-18:00"]'), int(request.form.get("capacity",3)), int(request.form.get("is_open",1))])
+        d.commit(); d.close()
+        return redirect(f"/school/{tid}/dashboard")
+    settings = d.execute("SELECT * FROM appointment_settings WHERE tenant_id=?", [tid]).fetchone()
+    d.close()
+    slots = json.loads(settings["time_slots"]) if settings else ["08:00-10:00","10:00-12:00","14:00-16:00","16:00-18:00"]
+    return f"""<!DOCTYPE html><html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>预约设置</title>
+<style>*{{margin:0;padding:0;box-sizing:border-box}}body{{font-family:-apple-system,sans-serif;background:#f0f2f5;padding:20px}}
+.card{{background:#fff;max-width:500px;margin:20px auto;padding:24px;border-radius:12px;box-shadow:0 2rpx 12rpx rgba(0,0,0,.06)}}
+h3{{font-size:18px;margin-bottom:20px}} label{{display:block;font-size:13px;color:#666;margin-bottom:6px;font-weight:500}}
+input,select{{width:100%;padding:10px;border:1px solid #d9d9d9;border-radius:6px;font-size:14px;margin-bottom:16px}}
+.slot-row{{display:flex;gap:10px;margin-bottom:10px;align-items:center}}
+.slot-row input{{flex:1;margin-bottom:0}}
+.slot-row button{{background:#ff4d4f;color:#fff;border:none;padding:6px 12px;border-radius:4px;cursor:pointer;font-size:12px}}
+.btn{{padding:10px 24px;background:#667eea;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:600;font-size:14px}}
+.btn-sm{{background:#1890ff;color:#fff;border:none;padding:6px 12px;border-radius:4px;cursor:pointer;font-size:12px;margin-top:8px}}
+a{{color:#999;text-decoration:none;font-size:13px;margin-left:12px}}
+</style></head><body><div class="card"><h3>⚙️ 预约设置</h3>
+<form method="POST" id="f">
+<label>预约开关</label><select name="is_open"><option value="1" {'selected' if settings and settings['is_open']==1 else ''}>开启</option><option value="0" {'selected' if settings and settings['is_open']==0 else ''}>关闭</option></select>
+<label>提前展示天数</label><input name="advance_days" type="number" min="1" max="30" value="{settings['advance_days'] if settings else 7}">
+<label>每时段可约人数</label><input name="capacity" type="number" min="1" max="20" value="{settings['capacity'] if settings else 3}">
+<label>可约时段</label>
+<div id="slots">{''.join(f'<div class="slot-row"><input name="slot_{i}" value="{s}"><button type="button" onclick="this.parentElement.remove()">删除</button></div>' for i,s in enumerate(slots))}</div>
+<button type="button" class="btn-sm" onclick="addSlot()">+ 添加时段</button>
+<input type="hidden" name="time_slots" id="time_slots_val">
+<div style="margin-top:20px"><button class="btn" type="submit" onclick="collectSlots()">💾 保存设置</button><a href="/school/{tid}/dashboard">← 返回</a></div>
+</form></div>
+<script>
+function addSlot(){{var d=document.createElement('div');d.className='slot-row';d.innerHTML='<input placeholder=\"如 08:00-10:00\" value=\"\"><button type=\"button\" onclick=\"this.parentElement.remove()\">删除</button>';document.getElementById('slots').appendChild(d)}}
+function collectSlots(){{var s=[];document.querySelectorAll('#slots input').forEach(function(i){{if(i.value.trim())s.push(i.value.trim())}});document.getElementById('time_slots_val').value=JSON.stringify(s)}}
+collectSlots();
+</script></body></html>"""
+
+@app.route("/api/public/<tid>/appointment-settings")
+def api_appointment_settings(tid):
+    d = db()
+    s = d.execute("SELECT * FROM appointment_settings WHERE tenant_id=?", [tid]).fetchone()
+    d.close()
+    if s:
+        return jsonify({"advance_days":s["advance_days"],"time_slots":json.loads(s["time_slots"]),"capacity":s["capacity"],"is_open":bool(s["is_open"])})
+    return jsonify({"advance_days":7,"time_slots":["08:00-10:00","10:00-12:00","14:00-16:00","16:00-18:00"],"capacity":3,"is_open":True})
 
 # ==================== 预约 API ====================
 
