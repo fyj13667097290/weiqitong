@@ -673,6 +673,9 @@ th{color:#999;font-weight:500}.empty{text-align:center;color:#bbb;padding:20px}
 {% for c in coaches %}<tr><td>{{c.name}}</td><td>{{c.experience}}年</td><td>{{c.rating or '-'}}</td><td><a class="btn-sm btn-del" href="/school/{{tenant.id}}/coach/{{c.id}}/delete" onclick="return confirm('确定删除？')">删除</a></td></tr>{% endfor %}</table>
 {% else %}<p class="empty">暂无教练</p>{% endif %}</div>
 
+<div class="card"><h3>👥 招生老师 <a href="/school/{{tenant.id}}/referrers">管理</a></h3>
+<p style="font-size:13px;color:#666">管理招生老师账号，查看各渠道推荐数据</p></div>
+
 <div class="card"><h3>📋 最近预约</h3>
 {% if appointments %}<table><tr><th>学员</th><th>电话</th><th>课程</th><th>时间</th><th>状态</th></tr>
 {% for a in appointments %}<tr><td>{{a.student_name}}</td><td>{{a.student_phone}}</td><td>{{a.course_type}}</td><td>{{a.appointment_time}}</td><td>{{a.status}}</td></tr>{% endfor %}</table>
@@ -849,6 +852,99 @@ def api_public_coaches(tid):
     return jsonify([dict(r) for r in rows])
 
 # ==================== 启动 ====================
+
+# ==================== 招生老师管理 ====================
+
+@app.route("/school/<tid>/referrers")
+def customer_referrers(tid):
+    if request.cookies.get("school_admin") != tid: return redirect(f"/school/{tid}/login")
+    d = db()
+    t = d.execute("SELECT * FROM tenants WHERE id=?", [tid]).fetchone()
+    referrers = d.execute("SELECT r.*, (SELECT COUNT(*) FROM referrals rf WHERE rf.referrer_id=r.id) as ref_count FROM referrers r WHERE r.tenant_id=? AND r.is_active=1 ORDER BY r.created_at DESC", [tid]).fetchall()
+    # 查询每个招生老师的最近报名
+    ref_data = []
+    for r in referrers:
+        rd = dict(r)
+        recent = d.execute("SELECT * FROM referrals WHERE referrer_id=? ORDER BY created_at DESC LIMIT 5", [r["id"]]).fetchall()
+        rd["recent"] = recent
+        ref_data.append(rd)
+    d.close()
+    return render_template_string(CUSTOMER_REFERRERS, tenant=dict(t), referrers=ref_data)
+
+CUSTOMER_REFERRERS = """<!DOCTYPE html><html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>招生老师管理</title>
+<style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,sans-serif;background:#f0f2f5}
+.header{background:#1e293b;color:#fff;padding:12px 20px;display:flex;justify-content:space-between;align-items:center}
+.header h2{font-size:16px}.header a{color:#94a3b8;text-decoration:none;font-size:13px}
+.container{max-width:900px;margin:0 auto;padding:20px}
+.card{background:#fff;border-radius:8px;padding:20px;margin-bottom:16px;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+.card h3{font-size:16px;margin-bottom:14px;display:flex;justify-content:space-between}
+.card h3 a{font-size:12px;color:#1890ff;text-decoration:none;font-weight:400}
+table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:8px 10px;text-align:left;border-bottom:1px solid #f0f0f0}
+th{color:#999;font-weight:500}.empty{text-align:center;color:#bbb;padding:20px}
+.tag{padding:2px 8px;border-radius:10px;font-size:11px}
+.tag-lead{background:#fff7e6;color:#fa8c16}.tag-signed{background:#f6ffed;color:#52c41a}
+.btn-sm{font-size:11px;padding:3px 8px;border-radius:3px;border:none;cursor:pointer;text-decoration:none;display:inline-block}
+.btn-del{background:#ff4d4f;color:#fff}</style></head><body>
+<div class="header"><h2>👥 {{tenant.name}} · 招生老师</h2><a href="/school/{{tenant.id}}/dashboard">← 返回</a></div>
+<div class="container">
+{% for r in referrers %}
+<div class="card">
+<h3>{{r.name}} <span style="font-size:12px;color:#999;font-weight:400">{{r.phone or ''}}</span>
+<div style="font-size:12px;color:#999">
+  专属码：<b style="color:#1890ff;font-size:14px">{{r.code}}</b> | 佣金：{{r.commission_rate}}%
+  <a class="btn-sm btn-del" href="/school/{{tenant.id}}/referrer/{{r.id}}/delete" onclick="return confirm('确定删除？')" style="margin-left:8px">删除</a>
+</div></h3>
+<p style="font-size:13px;color:#666;margin-bottom:8px">累计推荐：<b>{{r.ref_count}}</b> 人</p>
+{% if r.recent %}
+<table><tr><th>学员</th><th>电话</th><th>状态</th><th>时间</th></tr>
+{% for s in r.recent %}<tr>
+<td>{{s.student_name}}</td><td>{{s.student_phone}}</td>
+<td><span class="tag tag-{{s.status}}">{{s.status}}</span></td>
+<td>{{s.created_at[:16]}}</td>
+</tr>{% endfor %}</table>
+{% else %}<p class="empty">暂无推荐记录</p>{% endif %}
+</div>
+{% endfor %}
+{% if not referrers %}
+<div class="card"><p class="empty">还没有招生老师，点击右上角添加</p></div>
+{% endif %}
+<div class="card"><h3>+ 添加招生老师</h3>
+<form method="POST" action="/school/{{tenant.id}}/referrer/new" style="display:flex;gap:10px;flex-wrap:wrap;align-items:end">
+<input name="name" placeholder="姓名" required style="padding:8px;border:1px solid #d9d9d9;border-radius:4px;flex:1;min-width:80px">
+<input name="phone" placeholder="电话" style="padding:8px;border:1px solid #d9d9d9;border-radius:4px;flex:1;min-width:100px">
+<input name="code" placeholder="专属码（如ZS01）" required style="padding:8px;border:1px solid #d9d9d9;border-radius:4px;flex:1;min-width:80px">
+<input name="commission_rate" placeholder="佣金%" type="number" value="0" style="padding:8px;border:1px solid #d9d9d9;border-radius:4px;width:70px">
+<button class="btn-sm" type="submit" style="background:#667eea;color:#fff;padding:8px 16px;font-size:14px">添加</button>
+</form></div>
+</div></body></html>"""
+
+@app.route("/school/<tid>/referrer/new", methods=["POST"])
+def customer_referrer_new(tid):
+    if request.cookies.get("school_admin") != tid: return redirect(f"/school/{tid}/login")
+    d = db()
+    d.execute("INSERT INTO referrers (tenant_id,name,phone,code,commission_rate) VALUES (?,?,?,?,?)",
+              [tid, request.form["name"], request.form.get("phone",""), request.form["code"], float(request.form.get("commission_rate",0) or 0)])
+    d.commit(); d.close()
+    return redirect(f"/school/{tid}/referrers")
+
+@app.route("/school/<tid>/referrer/<int:rid>/delete")
+def customer_referrer_delete(tid, rid):
+    if request.cookies.get("school_admin") != tid: return redirect(f"/school/{tid}/login")
+    d = db(); d.execute("UPDATE referrers SET is_active=0 WHERE id=? AND tenant_id=?", [rid, tid]); d.commit(); d.close()
+    return redirect(f"/school/{tid}/referrers")
+
+# 公开API：记录推荐
+@app.route("/api/public/<tid>/referral", methods=["POST"])
+def api_referral(tid):
+    """学生通过招生老师链接访问时记录: {referrer_code, student_name, student_phone}"""
+    data = request.get_json()
+    code = data.get("referrer_code","")
+    d = db()
+    ref = d.execute("SELECT id FROM referrers WHERE tenant_id=? AND code=? AND is_active=1", [tid, code]).fetchone()
+    d.execute("INSERT INTO referrals (tenant_id,referrer_id,referrer_code,student_name,student_phone,source) VALUES (?,?,?,?,?,?)",
+              [tid, ref["id"] if ref else None, code, data.get("student_name",""), data.get("student_phone",""), data.get("source","mini_program")])
+    d.commit(); d.close()
+    return jsonify({"ok":True, "referrer": ref["id"] if ref else None})
 
 # ==================== 题库 API ====================
 
