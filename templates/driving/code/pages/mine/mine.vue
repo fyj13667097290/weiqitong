@@ -7,15 +7,15 @@
     </view>
 
     <view class="menu-section">
-      <view class="menu-item" @tap="goPage('appointment')">
+      <navigator url="/pages/appointment/appointment" class="menu-item">
         <text>📅 我的预约</text><text class="arrow">></text>
-      </view>
-      <view class="menu-item" @tap="goPage('exam')">
+      </navigator>
+      <navigator url="/pages/exam/exam" class="menu-item">
         <text>📝 我的成绩</text><text class="arrow">></text>
-      </view>
-      <view class="menu-item" @tap="goPage('courses')">
+      </navigator>
+      <navigator url="/pages/courses/courses" class="menu-item">
         <text>🎓 我的课程</text><text class="arrow">></text>
-      </view>
+      </navigator>
     </view>
 
     <view class="menu-section">

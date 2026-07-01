@@ -715,6 +715,12 @@ th{color:#999;font-weight:500}.empty{text-align:center;color:#bbb;padding:20px}
 <div class="header"><h2>🏫 {{tenant.name}}</h2><div><a href="/school/{{tenant.id}}/password" style="color:#94a3b8;text-decoration:none;font-size:13px;margin-right:16px">修改密码</a><a href="/school/{{tenant.id}}/login">退出</a></div></div>
 <div class="container">
 
+<div class="card"><h3>🖼️ 小程序背景</h3>
+<form method="POST" action="/school/{{tenant.id}}/upload-bg" enctype="multipart/form-data" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+<input type="file" name="bg_image" accept="image/*" required style="padding:6px;border:1px solid #d9d9d9;border-radius:4px;flex:1;min-width:200px">
+<button type="submit" class="btn-sm" style="background:#667eea;color:#fff;padding:8px 16px;font-size:13px">上传并设为背景</button>
+</form></div>
+
 <div class="card"><h3>📢 公告 <a href="/school/{{tenant.id}}/announcement/new">+ 发布</a></h3>
 {% if announcements %}<table><tr><th>标题</th><th>时间</th><th>操作</th></tr>
 {% for a in announcements %}<tr><td>{{a.title}}</td><td>{{a.created_at[:10]}}</td><td><a class="btn-sm btn-del" href="/school/{{tenant.id}}/announcement/{{a.id}}/delete" onclick="return confirm('确定删除？')">删除</a></td></tr>{% endfor %}</table>
@@ -887,6 +893,34 @@ def customer_impersonate(tid):
     resp = redirect(f"/school/{tid}/dashboard")
     resp.set_cookie("school_admin", tid, max_age=86400)
     return resp
+
+# ==================== 图片上传 ====================
+import os as _os
+UPLOAD_DIR = "/opt/jiaxiao/static/uploads"
+_os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+@app.route("/school/<tid>/upload-bg", methods=["POST"])
+def customer_upload_bg(tid):
+    if request.cookies.get("school_admin") != tid and request.cookies.get("admin_token") != get_admin_pw():
+        return redirect(f"/school/{tid}/login")
+    file = request.files.get("bg_image")
+    if not file: return "请选择图片", 400
+    ext = file.filename.rsplit(".",1)[-1].lower()
+    if ext not in ("jpg","jpeg","png","gif","webp"): return "仅支持 JPG/PNG/GIF/WEBP", 400
+    fname = f"{tid}_bg.{ext}"
+    file.save(_os.path.join(UPLOAD_DIR, fname))
+    url = f"https://jiaxiao.t-hub.cc/uploads/{fname}"
+    d = db()
+    latest = d.execute("SELECT * FROM configs WHERE tenant_id=? ORDER BY version DESC LIMIT 1", [tid]).fetchone()
+    if latest:
+        cfg = json.loads(latest["config"])
+        cfg["school"]["photos"] = [url]
+        new_ver = latest["version"] + 1
+        d.execute("INSERT INTO configs (tenant_id,version,config,status,mini_appid,mini_appname) VALUES (?,?,?,?,?,?)",
+                  [tid, new_ver, json.dumps(cfg, ensure_ascii=False), "draft", latest["mini_appid"] or "", latest["mini_appname"] or ""])
+        d.commit()
+    d.close()
+    return redirect(f"/school/{tid}/dashboard")
 
 # 公开API：小程序端读取动态内容
 @app.route("/api/public/<tid>/announcements")
