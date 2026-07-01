@@ -4,7 +4,24 @@
 """
 import sqlite3, json, uuid, os
 from datetime import date, datetime, timedelta
-from flask import Flask, request, jsonify, redirect, render_template_string
+from flask import Flask, request, jsonify, redirect, render_template_string, make_response
+
+ADMIN_PW_FILE = "/opt/jiaxiao/platform/admin/.admin_password"
+def get_admin_pw():
+    try: return open(ADMIN_PW_FILE).read().strip()
+    except: return "admin"
+
+def require_admin(f):
+    """装饰器：保护管理后台路由"""
+    from functools import wraps
+    @wraps(f)
+    def wrapped(*a,**kw):
+        if request.cookies.get("admin_token") != get_admin_pw():
+            if request.path.startswith("/api/"):
+                return jsonify({"error":"unauthorized"}), 401
+            return redirect("/login?next="+request.path)
+        return f(*a,**kw)
+    return wrapped
 
 app = Flask(__name__)
 DB = "/opt/jiaxiao/platform/admin/data.db"
@@ -425,7 +442,31 @@ function hardDelTenant(id,name){
 def landing():
     return LANDING_PAGE
 
+ADMIN_LOGIN_HTML = """<!DOCTYPE html><html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>微企通 · 管理员登录</title>
+<style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,sans-serif;background:linear-gradient(135deg,#1e3a5f,#2563eb);min-height:100vh;display:flex;align-items:center;justify-content:center}
+.card{background:#fff;border-radius:16px;padding:40px 30px;width:90%;max-width:380px;box-shadow:0 20px 60px rgba(0,0,0,.2);text-align:center}
+h2{font-size:22px;margin-bottom:4px}.sub{color:#999;font-size:13px;margin-bottom:24px}
+input{width:100%;padding:12px;border:1px solid #d9d9d9;border-radius:8px;font-size:16px;margin-bottom:16px;text-align:center}
+.btn{width:100%;padding:12px;background:#2563eb;color:#fff;border:none;border-radius:8px;font-size:16px;cursor:pointer;font-weight:600}
+.err{color:#ff4d4f;font-size:13px;margin-bottom:12px}</style></head><body>
+<div class="card"><h2>🏭 微企通</h2><p class="sub">管理后台登录</p>
+<form method="POST"><input type="password" name="password" placeholder="请输入管理员密码" required>
+{% if error %}<p class="err">{{error}}</p>{% endif %}
+<button class="btn" type="submit">登录</button></form></div></body></html>"""
+
+@app.route("/login", methods=["GET","POST"])
+def admin_login():
+    error = None
+    if request.method == "POST":
+        if request.form.get("password") == get_admin_pw():
+            resp = redirect(request.args.get("next","/admin"))
+            resp.set_cookie("admin_token", get_admin_pw(), max_age=86400*30)
+            return resp
+        error = "密码错误"
+    return render_template_string(ADMIN_LOGIN_HTML, error=error)
+
 @app.route("/admin")
+@require_admin
 def index():
     d = db()
     stats = {
@@ -452,6 +493,7 @@ def index():
     return render_template_string(ADMIN_PAGE, stats=stats, tenants=tenants, industries=industries, current_industry=industry, filter_status=filter_status)
 
 @app.route("/new")
+@require_admin
 def new_tenant():
     d = db()
     industries = d.execute("SELECT * FROM industries WHERE is_active=1 ORDER BY sort_order,id").fetchall()
@@ -459,6 +501,7 @@ def new_tenant():
     return render_template_string(HTML_NEW, industries=industries)
 
 @app.route("/tenants/<tid>/config")
+@require_admin
 def config_page(tid):
     d = db()
     t = d.execute("SELECT * FROM tenants WHERE id=?", [tid]).fetchone()
@@ -475,6 +518,7 @@ def api_list_tenants():
     return jsonify([row2dict(r) for r in rows])
 
 @app.route("/api/tenants", methods=["POST"])
+@require_admin
 def api_create_tenant():
     data = request.form
     tid = f"t{datetime.now().strftime('%Y%m%d%H%M%S')}{uuid.uuid4().hex[:4]}"
@@ -495,6 +539,7 @@ def api_get_tenant(tid):
     return jsonify(row2dict(r)) if r else (jsonify({"error":"not found"}), 404)
 
 @app.route("/api/tenants/<tid>", methods=["DELETE"])
+@require_admin
 def api_delete_tenant(tid):
     d = db()
     d.execute("UPDATE tenants SET status='inactive' WHERE id=?", [tid])
@@ -502,6 +547,7 @@ def api_delete_tenant(tid):
     return jsonify({"ok":True})
 
 @app.route("/api/tenants/<tid>/restore", methods=["POST"])
+@require_admin
 def api_restore_tenant(tid):
     d = db()
     d.execute("UPDATE tenants SET status='active' WHERE id=?", [tid])
@@ -509,6 +555,7 @@ def api_restore_tenant(tid):
     return jsonify({"ok":True})
 
 @app.route("/api/tenants/<tid>/hard-delete", methods=["DELETE"])
+@require_admin
 def api_hard_delete_tenant(tid):
     d = db()
     # 级联删除所有关联数据
@@ -543,6 +590,7 @@ def api_get_config(tid):
     return jsonify({"tenant_id":tid, "version":0, "config":default, "status":"draft"})
 
 @app.route("/api/tenants/<tid>/config", methods=["POST"])
+@require_admin
 def api_save_config(tid):
     data = request.get_json()
     d = db()
@@ -558,6 +606,7 @@ def api_save_config(tid):
 # ==================== API: 部署 ====================
 
 @app.route("/api/tenants/<tid>/deploy", methods=["POST"])
+@require_admin
 def api_deploy(tid):
     action = request.json.get("action", "upload")
     d = db()
@@ -597,6 +646,7 @@ def api_deployments(tid):
     return jsonify([row2dict(r) for r in rows])
 
 @app.route("/api/tenants/<tid>/trigger-deploy", methods=["POST"])
+@require_admin
 def api_trigger_github(tid):
     """服务端代理触发 GitHub Actions"""
     import urllib.request
@@ -823,6 +873,7 @@ h3{{margin-bottom:20px}}input{{width:100%;padding:10px;border:1px solid #d9d9d9;
 </div></body></html>"""
 
 @app.route("/school/<tid>/impersonate")
+@require_admin
 def customer_impersonate(tid):
     """超级管理员免密码进入客户后台"""
     resp = redirect(f"/school/{tid}/dashboard")
