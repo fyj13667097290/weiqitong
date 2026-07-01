@@ -347,7 +347,10 @@ th{color:#999;font-weight:500;font-size:13px;background:#fafafa}
 .industry-bar{display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap}
 .ind-item{padding:8px 16px;border-radius:20px;background:#fff;color:#666;text-decoration:none;font-size:13px;font-weight:500;box-shadow:0 1px 2px rgba(0,0,0,.06);transition:all .2s}
 .ind-item:hover{color:var(--primary)}
-.ind-item.active{background:var(--primary);color:#fff}</style></head><body>
+.ind-item.active{background:var(--primary);color:#fff}
+.filter-bar{display:flex;gap:8px;margin-bottom:16px}
+.filter-item{padding:6px 14px;border-radius:16px;background:#fff;color:#666;text-decoration:none;font-size:12px;font-weight:500;box-shadow:0 1px 2px rgba(0,0,0,.05)}
+.filter-item.active{background:#1e293b;color:#fff}</style></head><body>
 <div class="header"><h1>🏭 微企通 · 管理后台</h1></div>
 <div class="container">
 <div class="industry-bar">
@@ -355,6 +358,11 @@ th{color:#999;font-weight:500;font-size:13px;background:#fafafa}
   {% for ind in industries %}
   <a href="/admin?industry={{ind.id}}" class="ind-item {% if current_industry==ind.id %}active{% endif %}">{{ind.icon}} {{ind.name}}</a>
   {% endfor %}
+</div>
+<div class="filter-bar">
+  <a href="/admin?status=active{% if current_industry %}&industry={{current_industry}}{% endif %}" class="filter-item {% if filter_status=='active' %}active{% endif %}">🟢 活跃</a>
+  <a href="/admin?status=all{% if current_industry %}&industry={{current_industry}}{% endif %}" class="filter-item {% if filter_status=='all' %}active{% endif %}">📋 全部</a>
+  <a href="/admin?status=deleted{% if current_industry %}&industry={{current_industry}}{% endif %}" class="filter-item {% if filter_status=='deleted' %}active{% endif %}">🗑️ 已删除 ({{stats.deleted}})</a>
 </div>
 <div class="stats">
 <div class="stat"><div class="num">{{stats.tenants}}</div><div class="label">总客户</div></div>
@@ -371,8 +379,17 @@ th{color:#999;font-weight:500;font-size:13px;background:#fafafa}
 <td><span class="badge {% if t.status=='active' %}badge-active{% else %}badge-trial{% endif %}">{{t.status}}</span></td>
 <td><span class="badge {% if t.deploy_status=='success' %}badge-active{% elif t.deploy_status=='failed' %}badge-trial{% else %}badge-draft{% endif %}">{{t.deploy_status or '未部署'}}</span></td>
 <td>{{t.created_at[:10] if t.created_at else '-'}}</td>
-<td><a href="/tenants/{{t.id}}/config" class="btn btn-primary btn-sm">配置</a> <a href="/school/{{t.id}}/impersonate" class="btn btn-sm" style="background:#fa8c16;color:#fff;font-size:11px;padding:3px 8px;text-decoration:none;border-radius:3px">管理</a> <a href="/school/{{t.id}}/login" target="_blank" class="btn btn-sm" style="background:#52c41a;color:#fff;font-size:11px;padding:3px 8px;text-decoration:none;border-radius:3px">自助后台</a> <a href="#" onclick="copyLink('{{t.id}}')" class="btn btn-sm" style="background:#1890ff;color:#fff;font-size:11px;padding:3px 8px;text-decoration:none;border-radius:3px">复制链接</a> <a href="#" onclick="delTenant('{{t.id}}','{{t.name}}')" class="btn btn-sm" style="background:#ff4d4f;color:#fff;font-size:11px;padding:3px 8px;text-decoration:none;border-radius:3px">删除</a></td>
-</tr>{% endfor %}{% else %}<tr><td colspan="7" class="empty">还没有客户，点击右上角添加</td></tr>{% endif %}</tbody></table>
+<td>{% if t.status=='inactive' %}
+  <a href="#" onclick="restoreTenant('{{t.id}}')" class="btn btn-sm" style="background:#52c41a;color:#fff;font-size:11px;padding:3px 8px;text-decoration:none;border-radius:3px">恢复</a>
+  <a href="#" onclick="hardDelTenant('{{t.id}}','{{t.name}}')" class="btn btn-sm" style="background:#ff4d4f;color:#fff;font-size:11px;padding:3px 8px;text-decoration:none;border-radius:3px">彻底删除</a>
+{% else %}
+  <a href="/tenants/{{t.id}}/config" class="btn btn-primary btn-sm">配置</a>
+  <a href="/school/{{t.id}}/impersonate" class="btn btn-sm" style="background:#fa8c16;color:#fff;font-size:11px;padding:3px 8px;text-decoration:none;border-radius:3px">管理</a>
+  <a href="/school/{{t.id}}/login" target="_blank" class="btn btn-sm" style="background:#52c41a;color:#fff;font-size:11px;padding:3px 8px;text-decoration:none;border-radius:3px">自助后台</a>
+  <a href="#" onclick="copyLink('{{t.id}}')" class="btn btn-sm" style="background:#1890ff;color:#fff;font-size:11px;padding:3px 8px;text-decoration:none;border-radius:3px">复制链接</a>
+  <a href="#" onclick="delTenant('{{t.id}}','{{t.name}}')" class="btn btn-sm" style="background:#ff4d4f;color:#fff;font-size:11px;padding:3px 8px;text-decoration:none;border-radius:3px">删除</a>
+{% endif %}</td>
+</tr>{% endfor %}{% else %}<tr><td colspan="7" class="empty">{% if filter_status=='deleted' %}没有已删除的客户{% else %}还没有客户{% endif %}</td></tr>{% endif %}</tbody></table>
 </div></div>
 <script>
 function delTenant(id,name){
@@ -388,6 +405,19 @@ function copyLink(id){
   document.body.appendChild(ta); ta.select();
   try { document.execCommand('copy'); alert('已复制！\\n'+url); } catch(e) { prompt('手动复制', url); }
   document.body.removeChild(ta);
+}
+function restoreTenant(id){
+  if(!confirm('确定恢复此客户？')) return;
+  fetch('/api/tenants/'+id+'/restore',{method:'POST'}).then(function(r){return r.json()}).then(function(d){
+    if(d.ok){ alert('已恢复'); location.reload(); } else { alert('恢复失败'); }
+  });
+}
+function hardDelTenant(id,name){
+  if(!confirm('⚠️ 确定彻底删除「'+name+'」？\\n所有配置、公告、课程、教练数据将被永久清除，不可恢复！')) return;
+  if(!confirm('再次确认：彻底删除「'+name+'」？')) return;
+  fetch('/api/tenants/'+id+'/hard-delete',{method:'DELETE'}).then(function(r){return r.json()}).then(function(d){
+    if(d.ok){ alert('已彻底删除'); location.reload(); } else { alert('删除失败'); }
+  });
 }
 </script></body></html>"""
 
@@ -405,13 +435,21 @@ def index():
         "industries": d.execute("SELECT COUNT(*) as c FROM industries WHERE is_active=1").fetchone()["c"],
     }
     industry = request.args.get("industry", "")
-    if industry:
-        tenants = d.execute("SELECT t.*, i.name as industry_name, (SELECT d2.result FROM deployments d2 WHERE d2.tenant_id=t.id ORDER BY d2.created_at DESC LIMIT 1) as deploy_status FROM tenants t LEFT JOIN industries i ON t.industry_id=i.id WHERE t.industry_id=? ORDER BY t.created_at DESC", [industry]).fetchall()
-    else:
-        tenants = d.execute("SELECT t.*, i.name as industry_name, (SELECT d2.result FROM deployments d2 WHERE d2.tenant_id=t.id ORDER BY d2.created_at DESC LIMIT 1) as deploy_status FROM tenants t LEFT JOIN industries i ON t.industry_id=i.id ORDER BY t.created_at DESC").fetchall()
+    filter_status = request.args.get("status", "active")  # active / all / deleted
+    base_sql = "SELECT t.*, i.name as industry_name, (SELECT d2.result FROM deployments d2 WHERE d2.tenant_id=t.id ORDER BY d2.created_at DESC LIMIT 1) as deploy_status FROM tenants t LEFT JOIN industries i ON t.industry_id=i.id"
+    conditions = []
+    params = []
+    if industry: conditions.append("t.industry_id=?"); params.append(industry)
+    if filter_status == "active": conditions.append("t.status!='inactive'")
+    elif filter_status == "deleted": conditions.append("t.status='inactive'")
+    where = (" WHERE " + " AND ".join(conditions)) if conditions else ""
+    tenants = d.execute(base_sql + where + " ORDER BY t.created_at DESC", params).fetchall()
+    # 更新统计
+    stats["active"] = d.execute("SELECT COUNT(*) as c FROM tenants WHERE status!='inactive'").fetchone()["c"]
+    stats["deleted"] = d.execute("SELECT COUNT(*) as c FROM tenants WHERE status='inactive'").fetchone()["c"]
     industries = d.execute("SELECT * FROM industries WHERE is_active=1 ORDER BY sort_order,id").fetchall()
     d.close()
-    return render_template_string(ADMIN_PAGE, stats=stats, tenants=tenants, industries=industries, current_industry=industry)
+    return render_template_string(ADMIN_PAGE, stats=stats, tenants=tenants, industries=industries, current_industry=industry, filter_status=filter_status)
 
 @app.route("/new")
 def new_tenant():
@@ -460,6 +498,23 @@ def api_get_tenant(tid):
 def api_delete_tenant(tid):
     d = db()
     d.execute("UPDATE tenants SET status='inactive' WHERE id=?", [tid])
+    d.commit(); d.close()
+    return jsonify({"ok":True})
+
+@app.route("/api/tenants/<tid>/restore", methods=["POST"])
+def api_restore_tenant(tid):
+    d = db()
+    d.execute("UPDATE tenants SET status='active' WHERE id=?", [tid])
+    d.commit(); d.close()
+    return jsonify({"ok":True})
+
+@app.route("/api/tenants/<tid>/hard-delete", methods=["DELETE"])
+def api_hard_delete_tenant(tid):
+    d = db()
+    # 级联删除所有关联数据
+    for table in ["configs","deployments","wechat_auths","customer_admins","announcements","dynamic_courses","dynamic_coaches","appointments","operation_logs"]:
+        d.execute("DELETE FROM " + table + " WHERE tenant_id=?", [tid])
+    d.execute("DELETE FROM tenants WHERE id=?", [tid])
     d.commit(); d.close()
     return jsonify({"ok":True})
 
