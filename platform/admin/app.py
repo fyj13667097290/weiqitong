@@ -850,5 +850,27 @@ def api_public_coaches(tid):
 
 # ==================== 启动 ====================
 
+# ==================== 题库 API ====================
+
+@app.route("/api/public/<tid>/exam-questions")
+def api_exam_questions(tid):
+    d = db()
+    rows = d.execute("SELECT id,type,title,option_a,option_b,option_c,option_d,explain,chapter FROM exam_questions WHERE is_active=1 ORDER BY random() LIMIT 100").fetchall()
+    d.close()
+    return jsonify([dict(r) for r in rows])
+
+@app.route("/api/public/<tid>/exam-check", methods=["POST"])
+def api_exam_check(tid):
+    data = request.get_json()
+    qids = list(data.get("answers",{}).keys())
+    d = db()
+    placeholders = ",".join(["?" for _ in qids])
+    rows = d.execute(f"SELECT id,answer,explain FROM exam_questions WHERE id IN ({placeholders})", qids).fetchall()
+    d.close()
+    answers = {str(r["id"]): {"correct": r["answer"], "explain": r["explain"]} for r in rows}
+    return jsonify({"answers": answers})
+
+# ==================== 启动 ====================
+
 if __name__ == "__main__":
     app.run(host="127.0.0.1", port=5100, debug=False)
