@@ -566,5 +566,193 @@ def health():
 
 # ==================== 启动 ====================
 
+# ==================== 客户自助管理后台 ====================
+
+CUSTOMER_LOGIN = """<!DOCTYPE html><html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{{tenant.name}}管理后台</title>
+<style>*{margin:0;padding:0;box-sizing:border-box} body{font-family:-apple-system,sans-serif;background:linear-gradient(135deg,#667eea,#764ba2);min-height:100vh;display:flex;align-items:center;justify-content:center}
+.card{background:#fff;border-radius:16px;padding:40px 30px;width:90%;max-width:400px;box-shadow:0 20px 60px rgba(0,0,0,.2);text-align:center}
+h2{font-size:22px;margin-bottom:8px} .sub{color:#999;font-size:14px;margin-bottom:24px}
+input{width:100%;padding:12px;border:1px solid #d9d9d9;border-radius:8px;font-size:16px;margin-bottom:16px;text-align:center}
+.btn{width:100%;padding:12px;background:#667eea;color:#fff;border:none;border-radius:8px;font-size:16px;cursor:pointer;font-weight:600}
+.err{color:#ff4d4f;font-size:13px;margin-bottom:12px}</style></head><body>
+<div class="card"><h2>🏫 {{tenant.name}}</h2><p class="sub">小程序管理后台</p>
+<form method="POST"><input type="password" name="password" placeholder="请输入管理密码" required><br>
+{% if error %}<p class="err">{{error}}</p>{% endif %}
+<button class="btn" type="submit">登录</button></form></div></body></html>"""
+
+CUSTOMER_DASHBOARD = """<!DOCTYPE html><html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{{tenant.name}} · 管理</title>
+<style>:root{--primary:#667eea} *{margin:0;padding:0;box-sizing:border-box} body{font-family:-apple-system,sans-serif;background:#f0f2f5}
+.header{background:#1e293b;color:#fff;padding:12px 20px;display:flex;justify-content:space-between;align-items:center}
+.header h2{font-size:16px} .header a{color:#94a3b8;text-decoration:none;font-size:13px}
+.container{max-width:800px;margin:0 auto;padding:20px}
+.card{background:#fff;border-radius:8px;padding:20px;margin-bottom:16px;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+.card h3{font-size:16px;margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid #f0f0f0;display:flex;justify-content:space-between}
+.card h3 a{font-size:12px;color:var(--primary);text-decoration:none;font-weight:400}
+table{width:100%;border-collapse:collapse;font-size:13px} th,td{padding:8px 12px;text-align:left;border-bottom:1px solid #f0f0f0}
+th{color:#999;font-weight:500}.empty{text-align:center;color:#bbb;padding:20px}
+.btn-sm{font-size:11px;padding:3px 8px;border-radius:3px;border:none;cursor:pointer;text-decoration:none;color:#fff;display:inline-block}
+.btn-del{background:#ff4d4f}</style></head><body>
+<div class="header"><h2>🏫 {{tenant.name}}</h2><a href="/school/{{tenant.id}}/login">退出</a></div>
+<div class="container">
+
+<div class="card"><h3>📢 公告 <a href="/school/{{tenant.id}}/announcement/new">+ 发布</a></h3>
+{% if announcements %}<table><tr><th>标题</th><th>时间</th><th>操作</th></tr>
+{% for a in announcements %}<tr><td>{{a.title}}</td><td>{{a.created_at[:10]}}</td><td><a class="btn-sm btn-del" href="/school/{{tenant.id}}/announcement/{{a.id}}/delete" onclick="return confirm('确定删除？')">删除</a></td></tr>{% endfor %}</table>
+{% else %}<p class="empty">暂无公告</p>{% endif %}</div>
+
+<div class="card"><h3>💰 课程 <a href="/school/{{tenant.id}}/course/new">+ 添加</a></h3>
+{% if courses %}<table><tr><th>名称</th><th>价格</th><th>状态</th><th>操作</th></tr>
+{% for c in courses %}<tr><td>{{c.name}}</td><td>¥{{c.price}}</td><td>{{'显示' if c.is_visible else '隐藏'}}</td><td><a class="btn-sm btn-del" href="/school/{{tenant.id}}/course/{{c.id}}/delete" onclick="return confirm('确定删除？')">删除</a></td></tr>{% endfor %}</table>
+{% else %}<p class="empty">暂无动态课程（配置页的课程优先）</p>{% endif %}</div>
+
+<div class="card"><h3>👨‍🏫 教练 <a href="/school/{{tenant.id}}/coach/new">+ 添加</a></h3>
+{% if coaches %}<table><tr><th>姓名</th><th>教龄</th><th>评分</th><th>操作</th></tr>
+{% for c in coaches %}<tr><td>{{c.name}}</td><td>{{c.experience}}年</td><td>{{c.rating or '-'}}</td><td><a class="btn-sm btn-del" href="/school/{{tenant.id}}/coach/{{c.id}}/delete" onclick="return confirm('确定删除？')">删除</a></td></tr>{% endfor %}</table>
+{% else %}<p class="empty">暂无教练</p>{% endif %}</div>
+
+<div class="card"><h3>📋 最近预约</h3>
+{% if appointments %}<table><tr><th>学员</th><th>电话</th><th>课程</th><th>时间</th><th>状态</th></tr>
+{% for a in appointments %}<tr><td>{{a.student_name}}</td><td>{{a.student_phone}}</td><td>{{a.course_type}}</td><td>{{a.appointment_time}}</td><td>{{a.status}}</td></tr>{% endfor %}</table>
+{% else %}<p class="empty">暂无预约</p>{% endif %}</div>
+
+</div></body></html>"""
+
+@app.route("/school/<tid>/login", methods=["GET","POST"])
+def customer_login(tid):
+    d = db()
+    t = d.execute("SELECT * FROM tenants WHERE id=?", [tid]).fetchone()
+    if not t: d.close(); return "驾校不存在", 404
+    error = None
+    if request.method == "POST":
+        pw = request.form.get("password","")
+        admin = d.execute("SELECT * FROM customer_admins WHERE tenant_id=?", [tid]).fetchone()
+        # 首次登录自动创建管理员
+        if not admin:
+            d.execute("INSERT INTO customer_admins (tenant_id,password) VALUES (?,?)", [tid, pw])
+            d.commit()
+            admin = {"password": pw}
+        if pw == admin["password"]:
+            resp = redirect(f"/school/{tid}/dashboard")
+            resp.set_cookie("school_admin", tid, max_age=86400*7)
+            d.close()
+            return resp
+        error = "密码错误"
+    d.close()
+    return render_template_string(CUSTOMER_LOGIN, tenant=dict(t), error=error)
+
+@app.route("/school/<tid>/dashboard")
+def customer_dashboard(tid):
+    if request.cookies.get("school_admin") != tid:
+        return redirect(f"/school/{tid}/login")
+    d = db()
+    t = d.execute("SELECT * FROM tenants WHERE id=?", [tid]).fetchone()
+    announcements = d.execute("SELECT * FROM announcements WHERE tenant_id=? ORDER BY is_pinned DESC, created_at DESC", [tid]).fetchall()
+    courses = d.execute("SELECT * FROM dynamic_courses WHERE tenant_id=? ORDER BY sort_order", [tid]).fetchall()
+    coaches = d.execute("SELECT * FROM dynamic_coaches WHERE tenant_id=? ORDER BY sort_order", [tid]).fetchall()
+    appointments = d.execute("SELECT * FROM appointments WHERE tenant_id=? ORDER BY created_at DESC LIMIT 20", [tid]).fetchall()
+    d.close()
+    return render_template_string(CUSTOMER_DASHBOARD, tenant=dict(t), announcements=announcements, courses=courses, coaches=coaches, appointments=appointments)
+
+@app.route("/school/<tid>/announcement/new", methods=["GET","POST"])
+def customer_announcement_new(tid):
+    if request.cookies.get("school_admin") != tid: return redirect(f"/school/{tid}/login")
+    if request.method == "POST":
+        d = db()
+        d.execute("INSERT INTO announcements (tenant_id,title,content) VALUES (?,?,?)", [tid, request.form["title"], request.form.get("content","")])
+        d.commit(); d.close()
+        return redirect(f"/school/{tid}/dashboard")
+    return f"""<!DOCTYPE html><html lang="zh"><head><meta charset="utf-8"><title>发布公告</title>
+<style>*{{margin:0;padding:0}}body{{font-family:-apple-system,sans-serif;background:#f0f2f5;padding:20px}}
+.card{{background:#fff;max-width:500px;margin:40px auto;padding:24px;border-radius:8px}}
+h3{{margin-bottom:16px}} input,textarea{{width:100%;padding:10px;border:1px solid #d9d9d9;border-radius:4px;font-size:14px;margin-bottom:12px}}
+textarea{{resize:vertical;min-height:100px}}
+.btn{{padding:10px 24px;background:#667eea;color:#fff;border:none;border-radius:4px;cursor:pointer;font-weight:600}}
+</style></head><body><div class="card"><h3>📢 发布公告</h3>
+<form method="POST"><input name="title" placeholder="公告标题" required><textarea name="content" placeholder="公告内容"></textarea>
+<button class="btn" type="submit">发布</button><a href="/school/{tid}/dashboard" style="margin-left:12px;color:#999;font-size:13px">取消</a></form></div></body></html>"""
+
+@app.route("/school/<tid>/announcement/<int:aid>/delete")
+def customer_announcement_delete(tid, aid):
+    if request.cookies.get("school_admin") != tid: return redirect(f"/school/{tid}/login")
+    d = db(); d.execute("DELETE FROM announcements WHERE id=? AND tenant_id=?", [aid, tid]); d.commit(); d.close()
+    return redirect(f"/school/{tid}/dashboard")
+
+@app.route("/school/<tid>/course/new", methods=["GET","POST"])
+def customer_course_new(tid):
+    if request.cookies.get("school_admin") != tid: return redirect(f"/school/{tid}/login")
+    if request.method == "POST":
+        d = db()
+        d.execute("INSERT INTO dynamic_courses (tenant_id,name,price,original_price,features,tag) VALUES (?,?,?,?,?,?)",
+                  [tid, request.form["name"], float(request.form["price"]), float(request.form.get("original_price",0) or 0), request.form.get("features",""), request.form.get("tag","")])
+        d.commit(); d.close()
+        return redirect(f"/school/{tid}/dashboard")
+    return f"""<!DOCTYPE html><html lang="zh"><head><meta charset="utf-8"><title>添加课程</title>
+<style>*{{margin:0;padding:0}}body{{font-family:-apple-system,sans-serif;background:#f0f2f5;padding:20px}}
+.card{{background:#fff;max-width:500px;margin:40px auto;padding:24px;border-radius:8px}}
+h3{{margin-bottom:16px}} input{{width:100%;padding:10px;border:1px solid #d9d9d9;border-radius:4px;font-size:14px;margin-bottom:12px}}
+.row{{display:flex;gap:12px}} .row input{{flex:1}}
+.btn{{padding:10px 24px;background:#667eea;color:#fff;border:none;border-radius:4px;cursor:pointer;font-weight:600}}
+</style></head><body><div class="card"><h3>💰 添加课程</h3>
+<form method="POST"><input name="name" placeholder="课程名称" required><div class="row"><input name="price" placeholder="价格" type="number" required><input name="original_price" placeholder="原价（可选）" type="number"></div>
+<input name="features" placeholder="特色（逗号分隔，如：免费接送,不限课时）"><input name="tag" placeholder="标签（如：热销）">
+<button class="btn" type="submit">添加</button><a href="/school/{tid}/dashboard" style="margin-left:12px;color:#999;font-size:13px">取消</a></form></div></body></html>"""
+
+@app.route("/school/<tid>/course/<int:cid>/delete")
+def customer_course_delete(tid, cid):
+    if request.cookies.get("school_admin") != tid: return redirect(f"/school/{tid}/login")
+    d = db(); d.execute("DELETE FROM dynamic_courses WHERE id=? AND tenant_id=?", [cid, tid]); d.commit(); d.close()
+    return redirect(f"/school/{tid}/dashboard")
+
+@app.route("/school/<tid>/coach/new", methods=["GET","POST"])
+def customer_coach_new(tid):
+    if request.cookies.get("school_admin") != tid: return redirect(f"/school/{tid}/login")
+    if request.method == "POST":
+        d = db()
+        d.execute("INSERT INTO dynamic_coaches (tenant_id,name,experience,pass_rate,rating,tags,phone) VALUES (?,?,?,?,?,?,?)",
+                  [tid, request.form["name"], int(request.form.get("experience",0) or 0), int(request.form.get("pass_rate",0) or 0), float(request.form.get("rating",0) or 0), request.form.get("tags",""), request.form.get("phone","")])
+        d.commit(); d.close()
+        return redirect(f"/school/{tid}/dashboard")
+    return f"""<!DOCTYPE html><html lang="zh"><head><meta charset="utf-8"><title>添加教练</title>
+<style>*{{margin:0;padding:0}}body{{font-family:-apple-system,sans-serif;background:#f0f2f5;padding:20px}}
+.card{{background:#fff;max-width:500px;margin:40px auto;padding:24px;border-radius:8px}}
+h3{{margin-bottom:16px}} input{{width:100%;padding:10px;border:1px solid #d9d9d9;border-radius:4px;font-size:14px;margin-bottom:12px}}
+.row{{display:flex;gap:12px}} .row input{{flex:1}}
+.btn{{padding:10px 24px;background:#667eea;color:#fff;border:none;border-radius:4px;cursor:pointer;font-weight:600}}
+</style></head><body><div class="card"><h3>👨‍🏫 添加教练</h3>
+<form method="POST"><input name="name" placeholder="教练姓名" required><div class="row"><input name="experience" placeholder="教龄(年)" type="number"><input name="pass_rate" placeholder="通过率(%)" type="number"></div>
+<div class="row"><input name="rating" placeholder="评分(1-5)" type="number" step="0.1"><input name="phone" placeholder="电话"></div>
+<input name="tags" placeholder="特点（逗号分隔，如：耐心,技术好）">
+<button class="btn" type="submit">添加</button><a href="/school/{tid}/dashboard" style="margin-left:12px;color:#999;font-size:13px">取消</a></form></div></body></html>"""
+
+@app.route("/school/<tid>/coach/<int:cid>/delete")
+def customer_coach_delete(tid, cid):
+    if request.cookies.get("school_admin") != tid: return redirect(f"/school/{tid}/login")
+    d = db(); d.execute("DELETE FROM dynamic_coaches WHERE id=? AND tenant_id=?", [cid, tid]); d.commit(); d.close()
+    return redirect(f"/school/{tid}/dashboard")
+
+# 公开API：小程序端读取动态内容
+@app.route("/api/public/<tid>/announcements")
+def api_public_announcements(tid):
+    d = db()
+    rows = d.execute("SELECT id,title,content,created_at FROM announcements WHERE tenant_id=? ORDER BY is_pinned DESC, created_at DESC LIMIT 20", [tid]).fetchall()
+    d.close()
+    return jsonify([dict(r) for r in rows])
+
+@app.route("/api/public/<tid>/courses")
+def api_public_courses(tid):
+    d = db()
+    rows = d.execute("SELECT id,name,price,original_price,features,tag FROM dynamic_courses WHERE tenant_id=? AND is_visible=1 ORDER BY sort_order", [tid]).fetchall()
+    d.close()
+    return jsonify([dict(r) for r in rows])
+
+@app.route("/api/public/<tid>/coaches")
+def api_public_coaches(tid):
+    d = db()
+    rows = d.execute("SELECT id,name,experience,pass_rate,rating,tags,phone,avatar FROM dynamic_coaches WHERE tenant_id=? AND is_visible=1 ORDER BY sort_order", [tid]).fetchall()
+    d.close()
+    return jsonify([dict(r) for r in rows])
+
+# ==================== 启动 ====================
+
 if __name__ == "__main__":
     app.run(host="127.0.0.1", port=5100, debug=False)
