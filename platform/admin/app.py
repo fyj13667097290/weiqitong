@@ -5,8 +5,120 @@
 import sqlite3, json, uuid, os
 from datetime import date, datetime, timedelta
 from flask import Flask, request, jsonify, redirect, render_template_string, make_response
+import requests as _requests
+import time as _time
+import xml.etree.ElementTree as _ET
 
+app = Flask(__name__)
+DB = "/opt/jiaxiao/platform/admin/data.db"
 ADMIN_PW_FILE = "/opt/jiaxiao/platform/admin/.admin_password"
+
+# ==================== 微信第三方平台 ====================
+WX_COMPONENT_APPID = "wxf1d537dba4c5f6e9"
+WX_COMPONENT_SECRET = "56fd5df8a938e85447e2a8eb54bac7a1"
+WX_TOKEN = "weiqitong2026"
+WX_ENCODING_KEY = "FYJ3601211994062939321827089906115179196692"
+WX_TICKET_FILE = "/opt/jiaxiao/platform/admin/.wx_ticket"
+WX_ACCESS_TOKEN_FILE = "/opt/jiaxiao/platform/admin/.wx_access_token"
+
+def wx_get_stored(key, default=""):
+    try: return open(key).read().strip()
+    except: return default
+
+def wx_store(key, value):
+    with open(key, "w") as f: f.write(value)
+
+def wx_get_component_token():
+    """获取 component_access_token，有效期2小时，缓存到文件"""
+    cached = wx_get_stored(WX_ACCESS_TOKEN_FILE)
+    if cached:
+        parts = cached.split("|")
+        if len(parts)==2 and _time.time() < int(parts[1]):
+            return parts[0]
+    ticket = wx_get_stored(WX_TICKET_FILE)
+    if not ticket: return None
+    resp = _requests.post("https://api.weixin.qq.com/cgi-bin/component/api_component_token", json={
+        "component_appid": WX_COMPONENT_APPID,
+        "component_appsecret": WX_COMPONENT_SECRET,
+        "component_verify_ticket": ticket
+    }).json()
+    token = resp.get("component_access_token","")
+    if token:
+        wx_store(WX_ACCESS_TOKEN_FILE, token + "|" + str(int(_time.time())+7000))
+    return token
+
+def wx_get_pre_auth_code():
+    """获取预授权码"""
+    token = wx_get_component_token()
+    if not token: return None
+    resp = _requests.post(f"https://api.weixin.qq.com/cgi-bin/component/api_create_preauthcode?component_access_token={token}", json={
+        "component_appid": WX_COMPONENT_APPID
+    }).json()
+    return resp.get("pre_auth_code","")
+
+def wx_get_authorizer_info(authorizer_appid):
+    """获取授权方信息"""
+    token = wx_get_component_token()
+    if not token: return None
+    resp = _requests.post(f"https://api.weixin.qq.com/cgi-bin/component/api_get_authorizer_info?component_access_token={token}", json={
+        "component_appid": WX_COMPONENT_APPID,
+        "authorizer_appid": authorizer_appid
+    }).json()
+    return resp
+
+# ==================== 微信回调 ====================
+
+@app.route("/wechat/callback", methods=["POST"])
+def wechat_callback():
+    """接收微信推送: component_verify_ticket / 授权事件 / 审核结果"""
+    body = request.get_data(as_text=True)
+    app.logger.info(f"WX_CALLBACK: {body[:200]}")
+    try:
+        xml = _ET.fromstring(body)
+        info_type = xml.findtext("InfoType")
+        if info_type == "component_verify_ticket":
+            ticket = xml.findtext("ComponentVerifyTicket")
+            if ticket:
+                wx_store(WX_TICKET_FILE, ticket)
+                app.logger.info(f"WX_TICKET_SAVED: {ticket[:20]}...")
+                # 清除旧token强制刷新
+                wx_store(WX_ACCESS_TOKEN_FILE, "")
+        elif info_type == "authorized":
+            # 授权成功
+            authorizer_appid = xml.findtext("AuthorizerAppid")
+            auth_code = xml.findtext("AuthorizationCode")
+            token = wx_get_component_token()
+            if token and auth_code:
+                resp = _requests.post(f"https://api.weixin.qq.com/cgi-bin/component/api_query_auth?component_access_token={token}", json={
+                    "component_appid": WX_COMPONENT_APPID,
+                    "authorization_code": auth_code
+                }).json()
+                info = resp.get("authorization_info",{})
+                if info:
+                    d = db()
+                    # 根据authorizer_appid找到对应租户
+                    tenant = d.execute("SELECT id FROM tenants WHERE id IN (SELECT tenant_id FROM configs WHERE mini_appid=?)", [authorizer_appid]).fetchone()
+                    if tenant:
+                        d.execute("INSERT OR REPLACE INTO wechat_auths (tenant_id,authorizer_appid,authorizer_access_token,authorizer_refresh_token,authorized_at) VALUES (?,?,?,?,datetime('now'))",
+                                  [tenant["id"], authorizer_appid, info.get("authorizer_access_token",""), info.get("authorizer_refresh_token","")])
+                        d.commit()
+                    d.close()
+                    app.logger.info(f"WX_AUTHORIZED: {authorizer_appid}")
+        elif info_type == "unauthorized":
+            authorizer_appid = xml.findtext("AuthorizerAppid")
+            d = db()
+            d.execute("DELETE FROM wechat_auths WHERE authorizer_appid=?", [authorizer_appid])
+            d.commit(); d.close()
+        elif info_type == "weapp_audit_success":
+            appid = xml.findtext("ToAppid")
+            app.logger.info(f"WX_AUDIT_SUCCESS: {appid}")
+        elif info_type == "weapp_audit_fail":
+            appid = xml.findtext("ToAppid")
+            reason = xml.findtext("Reason") or "未知原因"
+            app.logger.info(f"WX_AUDIT_FAIL: {appid} - {reason}")
+    except Exception as e:
+        app.logger.error(f"WX_CALLBACK_ERROR: {e}")
+    return "success"
 def get_admin_pw():
     try: return open(ADMIN_PW_FILE).read().strip()
     except: return "admin"
@@ -23,8 +135,6 @@ def require_admin(f):
         return f(*a,**kw)
     return wrapped
 
-app = Flask(__name__)
-DB = "/opt/jiaxiao/platform/admin/data.db"
 
 def db():
     conn = sqlite3.connect(DB)
@@ -893,6 +1003,100 @@ def customer_impersonate(tid):
     resp = redirect(f"/school/{tid}/dashboard")
     resp.set_cookie("school_admin", tid, max_age=86400)
     return resp
+
+# ==================== 微信授权 & 代码上传 ====================
+
+@app.route("/api/wechat/auth-url/<tid>")
+@require_admin
+def wechat_auth_url(tid):
+    """生成驾校老板扫码授权的URL"""
+    code = wx_get_pre_auth_code()
+    if not code: return jsonify({"error":"获取预授权码失败，请稍后重试"}), 500
+    url = f"https://mp.weixin.qq.com/cgi-bin/componentloginpage?component_appid={WX_COMPONENT_APPID}&pre_auth_code={code}&redirect_uri=https://jiaxiao.t-hub.cc/school/{tid}/dashboard"
+    return jsonify({"url": url, "tip":"请将此链接发给驾校老板，用微信打开后扫码授权"})
+
+@app.route("/api/wechat/upload-code/<tid>", methods=["POST"])
+@require_admin
+def wechat_upload_code(tid):
+    """上传代码到授权小程序"""
+    d = db()
+    auth = d.execute("SELECT * FROM wechat_auths WHERE tenant_id=?", [tid]).fetchone()
+    if not auth: d.close(); return jsonify({"error":"该驾校尚未授权，请先生成授权链接"}), 400
+    token = auth["authorizer_access_token"]
+    config = d.execute("SELECT * FROM configs WHERE tenant_id=? ORDER BY version DESC LIMIT 1", [tid]).fetchone()
+    d.close()
+    if not config: return jsonify({"error":"请先保存小程序配置"}), 400
+
+    cfg = json.loads(config["config"])
+    # 构造ext.json注入驾校配置
+    ext_json = json.dumps({
+        "extEnable": True,
+        "extAppid": auth["authorizer_appid"],
+        "directCommit": False,
+        "ext": {
+            "schoolName": cfg["school"]["name"],
+            "schoolPhone": cfg["school"]["phone"],
+            "primaryColor": cfg["school"]["theme"]["primaryColor"]
+        }
+    }, ensure_ascii=False)
+
+    # 1. 提交代码
+    commit_resp = _requests.post(f"https://api.weixin.qq.com/wxa/commit?access_token={token}", json={
+        "template_id": 0,  # 0=不使用模板，直接上传
+        "ext_json": ext_json,
+        "user_version": f"v{config['version']}",
+        "user_desc": "小程序工厂自动部署"
+    }).json()
+    if commit_resp.get("errcode",0) != 0:
+        return jsonify({"error":commit_resp.get("errmsg","上传失败"),"detail":commit_resp})
+
+    return jsonify({"ok":True,"message":"代码已上传","version":f"v{config['version']}"})
+
+@app.route("/api/wechat/submit-audit/<tid>", methods=["POST"])
+@require_admin
+def wechat_submit_audit(tid):
+    """提交代码审核"""
+    d = db()
+    auth = d.execute("SELECT * FROM wechat_auths WHERE tenant_id=?", [tid]).fetchone()
+    d.close()
+    if not auth: return jsonify({"error":"该驾校尚未授权"}), 400
+    token = auth["authorizer_access_token"]
+
+    data = request.get_json() or {}
+    item_list = data.get("item_list", [
+        {"address":"pages/index/index","tag":"驾校预约","title":"首页"},
+        {"address":"pages/courses/courses","tag":"在线教育","title":"培训课程"},
+        {"address":"pages/appointment/appointment","tag":"预约预订","title":"预约练车"}
+    ])
+    resp = _requests.post(f"https://api.weixin.qq.com/wxa/submit_audit?access_token={token}", json={"item_list": item_list}).json()
+    if resp.get("errcode",0) != 0:
+        return jsonify({"error":resp.get("errmsg","提审失败"),"detail":resp})
+    return jsonify({"ok":True,"auditid":resp.get("auditid"),"message":"审核已提交，预计1-7个工作日"})
+
+@app.route("/api/wechat/release/<tid>", methods=["POST"])
+@require_admin
+def wechat_release(tid):
+    """发布已审核通过的小程序"""
+    d = db()
+    auth = d.execute("SELECT * FROM wechat_auths WHERE tenant_id=?", [tid]).fetchone()
+    d.close()
+    if not auth: return jsonify({"error":"未授权"}), 400
+    token = auth["authorizer_access_token"]
+    resp = _requests.post(f"https://api.weixin.qq.com/wxa/release?access_token={token}", json={}).json()
+    if resp.get("errcode",0) != 0:
+        return jsonify({"error":resp.get("errmsg","发布失败"),"detail":resp})
+    return jsonify({"ok":True,"message":"已发布上线"})
+
+@app.route("/api/wechat/auth-status/<tid>")
+@require_admin
+def wechat_auth_status(tid):
+    """查看驾校授权状态"""
+    d = db()
+    auth = d.execute("SELECT authorizer_appid,authorized_at FROM wechat_auths WHERE tenant_id=?", [tid]).fetchone()
+    d.close()
+    if auth:
+        return jsonify({"authorized":True,"appid":auth["authorizer_appid"],"time":auth["authorized_at"]})
+    return jsonify({"authorized":False})
 
 # ==================== 图片上传 ====================
 import os as _os
