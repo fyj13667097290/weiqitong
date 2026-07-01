@@ -1,4 +1,8 @@
 {
+  "_meta": {
+    "tenantId": "t202606300935551af6",
+    "apiBase": "https://jiaxiao.t-hub.cc"
+  },
   "school": {
     "name": "{{school_name}}",
     "shortName": "{{school_short_name}}",
