@@ -525,6 +525,7 @@ th{color:#999;font-weight:500;font-size:13px;background:#fafafa}
 {% else %}
   <a href="/tenants/{{t.id}}/config" class="btn btn-primary btn-sm">配置</a>
   <a href="#" onclick="authWx('{{t.id}}')" class="btn btn-sm" style="background:#722ed1;color:#fff;font-size:11px;padding:3px 8px;text-decoration:none;border-radius:3px">授权</a>
+  <a href="#" onclick="regWx('{{t.id}}','{{t.name}}')" class="btn btn-sm" style="background:#eb2f96;color:#fff;font-size:11px;padding:3px 8px;text-decoration:none;border-radius:3px">注册小程序</a>
   <a href="/school/{{t.id}}/impersonate" class="btn btn-sm" style="background:#fa8c16;color:#fff;font-size:11px;padding:3px 8px;text-decoration:none;border-radius:3px">管理</a>
   <a href="/school/{{t.id}}/login" target="_blank" class="btn btn-sm" style="background:#52c41a;color:#fff;font-size:11px;padding:3px 8px;text-decoration:none;border-radius:3px">自助后台</a>
   <a href="#" onclick="copyLink('{{t.id}}')" class="btn btn-sm" style="background:#1890ff;color:#fff;font-size:11px;padding:3px 8px;text-decoration:none;border-radius:3px">复制链接</a>
@@ -542,8 +543,27 @@ function delTenant(id,name){
 function authWx(id){
   fetch('/api/wechat/auth-url/'+id).then(function(r){return r.json()}).then(function(d){
     if(d.url) prompt('复制此链接发给客户，在微信中打开授权：', d.url);
-    else alert('获取失败，请稍后重试');
+    else alert('获取失败');
   });
+}
+function regWx(id,name){
+  var data = {};
+  data.mp_name = prompt('小程序名称（如：'+name.replace('培训','')+'）', name);
+  if(!data.mp_name) return;
+  data.legal_name = prompt('法人姓名：');
+  if(!data.legal_name) return;
+  data.legal_wechat = prompt('法人微信号：');
+  if(!data.legal_wechat) return;
+  data.license_code = prompt('统一社会信用代码（营业执照18位）：');
+  if(!data.license_code) return;
+  data.phone = prompt('联系电话（审核通知用）：', '');
+  fetch('/api/wechat/fast-register/'+id, {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)})
+    .then(function(r){return r.json()}).then(function(d){
+      if(d.qrcode_base64){
+        var w = window.open('','_blank','width=400,height=500');
+        w.document.write('<div style=\"text-align:center;padding:20px;font-family:sans-serif\"><h3>请法人扫码确认</h3><img src=\"data:image/png;base64,'+d.qrcode_base64+'\" style=\"width:280px\"/><p style=\"color:#999;font-size:13px\">用微信扫码后，在手机端确认创建小程序</p></div>');
+      } else { alert('失败: '+(d.error||'未知错误')); }
+    });
 }
 function copyLink(id){
   var url = 'https://jiaxiao.t-hub.cc/school/'+id+'/login';
@@ -1193,6 +1213,43 @@ def wechat_auth_status(tid):
     if auth:
         return jsonify({"authorized":True,"appid":auth["authorizer_appid"],"time":auth["authorized_at"]})
     return jsonify({"authorized":False})
+
+# ==================== 代注册小程序 ====================
+
+@app.route("/api/wechat/fast-register/<tid>", methods=["POST"])
+@require_admin
+def wechat_fast_register(tid):
+    """帮客户一键注册小程序"""
+    d = db()
+    t = d.execute("SELECT * FROM tenants WHERE id=?", [tid]).fetchone()
+    if not t: d.close(); return jsonify({"error":"客户不存在"}), 404
+    token = wx_get_component_token()
+    if not token: d.close(); return jsonify({"error":"微信服务暂不可用"}), 500
+
+    data = request.get_json()
+    resp = _requests.post(
+        f"https://api.weixin.qq.com/cgi-bin/component/fastregisterweapp?action=create&component_access_token={token}",
+        json={
+            "name": data.get("mp_name", t["name"]),
+            "code": data.get("license_code", ""),
+            "code_type": 1,
+            "legal_persona_wechat": data.get("legal_wechat", ""),
+            "legal_persona_name": data.get("legal_name", ""),
+            "component_phone": data.get("phone", t["contact_phone"] or "")
+        }
+    ).json()
+
+    if resp.get("errcode", 0) != 0:
+        err = resp.get("errmsg", "注册失败")
+        d.close(); return jsonify({"error": err})
+
+    # 保存法人信息
+    d.execute("UPDATE tenants SET contact_name=?, contact_phone=? WHERE id=?",
+              [data.get("legal_name", t["contact_name"] or ""), data.get("phone", t["contact_phone"] or ""), tid])
+    d.commit(); d.close()
+
+    return jsonify({"ok": True, "qrcode_base64": resp.get("qrcode_url", ""),
+                    "tip": "请将二维码发给法人，用微信扫码后在小程序内确认。确认后小程序自动创建并授权给平台。"})
 
 # ==================== 图片上传 ====================
 import os as _os
