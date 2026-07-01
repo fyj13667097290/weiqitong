@@ -75,7 +75,7 @@ input,select,textarea{width:100%;padding:10px 12px;border:1px solid #d9d9d9;bord
 <div class="form-group"><label>简称</label><input name="short_name" placeholder="如：鑫达驾校" maxlength="10"></div>
 <div class="form-group"><label>联系人</label><input name="contact_name" placeholder="驾校老板姓名"></div>
 <div class="form-group"><label>联系电话</label><input name="contact_phone" placeholder="手机号"></div>
-<div class="form-group"><label>行业</label><select name="industry_id"><option value="drv001">🚗 驾校</option></select></div>
+<div class="form-group"><label>行业</label><select name="industry_id">{% for ind in industries %}<option value="{{ind.id}}">{{ind.icon}} {{ind.name}}</option>{% endfor %}</select></div>
 <div class="form-group"><label>套餐</label><select name="plan"><option value="trial">试用版（免费14天）</option><option value="basic">基础版 999元/年</option><option value="standard">标准版 1999元/年</option><option value="pro">专业版 2999元/年</option></select></div>
 <button type="submit" class="btn btn-primary">创建客户</button></form></div></div></body></html>"""
 
@@ -342,9 +342,20 @@ table{width:100%;border-collapse:collapse} th,td{padding:10px 12px;text-align:le
 th{color:#999;font-weight:500;font-size:13px;background:#fafafa}
 .badge{padding:2px 10px;border-radius:10px;font-size:12px;font-weight:500}
 .badge-active{background:#f6ffed;color:#52c41a}.badge-trial{background:#fff7e6;color:#fa8c16}
-.empty{text-align:center;color:#bbb;padding:40px}</style></head><body>
-<div class="header"><h1>🏭 微企通 · 管理后台</h1><span style="color:#94a3b8;font-size:13px">驾校行业 v1.0</span></div>
+.badge-draft{background:#f5f5f5;color:#999}
+.empty{text-align:center;color:#bbb;padding:40px}
+.industry-bar{display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap}
+.ind-item{padding:8px 16px;border-radius:20px;background:#fff;color:#666;text-decoration:none;font-size:13px;font-weight:500;box-shadow:0 1px 2px rgba(0,0,0,.06);transition:all .2s}
+.ind-item:hover{color:var(--primary)}
+.ind-item.active{background:var(--primary);color:#fff}</style></head><body>
+<div class="header"><h1>🏭 微企通 · 管理后台</h1></div>
 <div class="container">
+<div class="industry-bar">
+  <a href="/admin" class="ind-item {% if not current_industry %}active{% endif %}">📊 全部</a>
+  {% for ind in industries %}
+  <a href="/admin?industry={{ind.id}}" class="ind-item {% if current_industry==ind.id %}active{% endif %}">{{ind.icon}} {{ind.name}}</a>
+  {% endfor %}
+</div>
 <div class="stats">
 <div class="stat"><div class="num">{{stats.tenants}}</div><div class="label">总客户</div></div>
 <div class="stat"><div class="num">{{stats.active}}</div><div class="label">活跃客户</div></div>
@@ -377,13 +388,21 @@ def index():
         "deployed": d.execute("SELECT COUNT(*) as c FROM configs WHERE status IN ('deployed','published')").fetchone()["c"],
         "industries": d.execute("SELECT COUNT(*) as c FROM industries WHERE is_active=1").fetchone()["c"],
     }
-    tenants = d.execute("SELECT t.*, i.name as industry_name, (SELECT d2.result FROM deployments d2 WHERE d2.tenant_id=t.id ORDER BY d2.created_at DESC LIMIT 1) as deploy_status FROM tenants t LEFT JOIN industries i ON t.industry_id=i.id ORDER BY t.created_at DESC").fetchall()
+    industry = request.args.get("industry", "")
+    if industry:
+        tenants = d.execute("SELECT t.*, i.name as industry_name, (SELECT d2.result FROM deployments d2 WHERE d2.tenant_id=t.id ORDER BY d2.created_at DESC LIMIT 1) as deploy_status FROM tenants t LEFT JOIN industries i ON t.industry_id=i.id WHERE t.industry_id=? ORDER BY t.created_at DESC", [industry]).fetchall()
+    else:
+        tenants = d.execute("SELECT t.*, i.name as industry_name, (SELECT d2.result FROM deployments d2 WHERE d2.tenant_id=t.id ORDER BY d2.created_at DESC LIMIT 1) as deploy_status FROM tenants t LEFT JOIN industries i ON t.industry_id=i.id ORDER BY t.created_at DESC").fetchall()
+    industries = d.execute("SELECT * FROM industries WHERE is_active=1 ORDER BY sort_order,id").fetchall()
     d.close()
-    return render_template_string(ADMIN_PAGE, stats=stats, tenants=tenants)
+    return render_template_string(ADMIN_PAGE, stats=stats, tenants=tenants, industries=industries, current_industry=industry)
 
 @app.route("/new")
 def new_tenant():
-    return render_template_string(HTML_NEW)
+    d = db()
+    industries = d.execute("SELECT * FROM industries WHERE is_active=1 ORDER BY sort_order,id").fetchall()
+    d.close()
+    return render_template_string(HTML_NEW, industries=industries)
 
 @app.route("/tenants/<tid>/config")
 def config_page(tid):
