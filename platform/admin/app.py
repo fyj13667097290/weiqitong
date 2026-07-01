@@ -273,17 +273,22 @@ async function deploy(){
 }
 
 async function loadDeployments(){
-  const r = await fetch('/api/tenants/'+tid+'/deployments');
-  const list = await r.json();
-  document.getElementById('deploy-status').innerHTML = list.length
-    ? `<p>最近部署：<strong>${list[0].action}</strong> — <span style="color:${list[0].result==='success'?'#52c41a':'#fa8c16'}">${list[0].result}</span> (${list[0].created_at})</p>`
-    : '<p style="color:#999">还没有部署记录</p>';
-  document.getElementById('deploy-log').textContent = list.map(d => `[${d.created_at}] ${d.action}: ${d.result} — ${d.message||''}`).join('\n') || '暂无日志';
+  try {
+    const r = await fetch('/api/tenants/'+tid+'/deployments');
+    const list = await r.json();
+    var ds = document.getElementById('deploy-status');
+    if(list.length){
+      var a = list[0].action, re = list[0].result, t = list[0].created_at;
+      ds.innerHTML = '<p>最近部署：<strong>'+a+'</strong> — <span style="color:'+(re==='success'?'#52c41a':'#fa8c16')+'">'+re+'</span> ('+t+')</p>';
+    } else { ds.innerHTML = '<p style="color:#999">还没有部署记录</p>'; }
+    var lines = []; for(var i=0;i<list.length;i++){ var d=list[i]; lines.push('['+d.created_at+'] '+d.action+': '+d.result); }
+    document.getElementById('deploy-log').textContent = lines.join('\\n') || '暂无日志';
+  } catch(e){}
 }
 
 function log(msg){
-  const el = document.getElementById('deploy-log');
-  el.textContent = `[${new Date().toLocaleTimeString()}] ${msg}\n` + el.textContent;
+  var el = document.getElementById('deploy-log');
+  el.textContent = '['+new Date().toLocaleTimeString()+'] '+msg+'\\n' + el.textContent;
 }
 
 </script></body></html>"""
