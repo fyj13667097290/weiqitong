@@ -2,12 +2,13 @@
 小程序工厂 - 管理后台 API v2
 多租户 + JSON配置驱动 + 行业模板可插拔
 """
-import sqlite3, json, uuid, os
+import sqlite3, json, uuid, os, base64, hashlib, struct, socket
 from datetime import date, datetime, timedelta
 from flask import Flask, request, jsonify, redirect, render_template_string, make_response
 import requests as _requests
 import time as _time
 import xml.etree.ElementTree as _ET
+from Crypto.Cipher import AES
 
 app = Flask(__name__)
 DB = "/opt/jiaxiao/platform/admin/data.db"
@@ -18,6 +19,22 @@ WX_COMPONENT_APPID = "wxf1d537dba4c5f6e9"
 WX_COMPONENT_SECRET = "56fd5df8a938e85447e2a8eb54bac7a1"
 WX_TOKEN = "weiqitong2026"
 WX_ENCODING_KEY = "FYJ3601211994062939321827089906115179196692"
+
+def wx_decrypt(encrypted, msg_signature, timestamp, nonce):
+    """解密微信推送的加密消息"""
+    try:
+        aes_key = base64.b64decode(WX_ENCODING_KEY + "=")
+        cipher = AES.new(aes_key, AES.MODE_CBC, aes_key[:16])
+        decrypted = cipher.decrypt(base64.b64decode(encrypted))
+        # 去掉padding
+        pad = decrypted[-1]
+        decrypted = decrypted[:-pad]
+        # 前16字节random，接下来4字节msg_len，后面是消息，最后是appid
+        content = decrypted[20:]
+        return content.decode("utf-8")
+    except Exception as e:
+        app.logger.error(f"WX_DECRYPT_ERROR: {e}")
+        return None
 WX_TICKET_FILE = "/opt/jiaxiao/platform/admin/.wx_ticket"
 WX_ACCESS_TOKEN_FILE = "/opt/jiaxiao/platform/admin/.wx_access_token"
 
@@ -68,13 +85,23 @@ def wx_get_authorizer_info(authorizer_appid):
 
 # ==================== 微信回调 ====================
 
-@app.route("/wechat/callback", methods=["POST"])
+@app.route("/wechat/callback", methods=["GET","POST"])
 def wechat_callback():
     """接收微信推送: component_verify_ticket / 授权事件 / 审核结果"""
+    if request.method == "GET":
+        return request.args.get("echostr","")
     body = request.get_data(as_text=True)
-    app.logger.info(f"WX_CALLBACK: {body[:200]}")
     try:
         xml = _ET.fromstring(body)
+        enc = xml.findtext("Encrypt")
+        if enc:
+            # 加密消息：先解密
+            sig = request.args.get("msg_signature","")
+            ts = request.args.get("timestamp","")
+            nonce = request.args.get("nonce","")
+            decrypted = wx_decrypt(enc, sig, ts, nonce)
+            if decrypted:
+                xml = _ET.fromstring(decrypted)
         info_type = xml.findtext("InfoType")
         if info_type == "component_verify_ticket":
             ticket = xml.findtext("ComponentVerifyTicket")
