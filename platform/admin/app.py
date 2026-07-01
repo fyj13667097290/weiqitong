@@ -172,19 +172,27 @@ const tid = window.location.pathname.split('/')[2];
 let cfg = {school:{name:'',shortName:'',logo:'',phone:'',address:'',description:'',photos:[],theme:{primaryColor:'#1890ff'}},courses:[],coaches:[],locations:[],features:{appointment:true,examPrep:true,onlinePayment:false}};
 
 // === TAB ===
-document.querySelectorAll('.tab-item').forEach(t => t.onclick = () => {
-  document.querySelectorAll('.tab-item,.tab-content').forEach(e => e.classList.remove('active'));
-  t.classList.add('active');
-  document.getElementById(t.dataset.tab).classList.add('active');
-  if(t.dataset.tab === 'tab-deploy') loadDeployments();
-});
+(function initTabs(){
+  document.querySelectorAll('.tab-item').forEach(function(t){
+    t.onclick = function(){
+      document.querySelectorAll('.tab-item').forEach(function(e){e.classList.remove('active')});
+      document.querySelectorAll('.tab-content').forEach(function(e){e.classList.remove('active')});
+      t.classList.add('active');
+      var el = document.getElementById(t.dataset.tab);
+      if(el){ el.classList.add('active'); if(t.dataset.tab==='tab-deploy') loadDeployments(); }
+    };
+  });
+  load();
+})();
 
 // === LOAD ===
 async function load(){
-  const r = await fetch('/api/tenants/'+tid+'/config');
-  const d = await r.json();
-  if(d.config) cfg = d.config;
-  renderAll();
+  try {
+    const r = await fetch('/api/tenants/'+tid+'/config');
+    const d = await r.json();
+    if(d.config) cfg = d.config;
+    renderAll();
+  } catch(e){ console.error(e); }
 }
 function renderAll(){
   // basic
@@ -280,7 +288,6 @@ function log(msg){
   el.textContent = `[${new Date().toLocaleTimeString()}] ${msg}\n` + el.textContent;
 }
 
-load();
 </script></body></html>"""
 
 LANDING_PAGE = """<!DOCTYPE html><html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>微企通 - 中小企业小程序解决方案</title>
@@ -402,7 +409,7 @@ def api_create_tenant():
                "trial", data.get("plan","trial"),
                (date.today() + timedelta(days=14)).isoformat()])
     d.commit(); d.close()
-    return render_template_string("""<html><body><script>alert('客户创建成功！');location.href='/'</script></body></html>"""), 201
+    return render_template_string("""<html><body><script>alert('客户创建成功！');location.href='/admin'</script></body></html>"""), 201
 
 @app.route("/api/tenants/<tid>", methods=["GET"])
 def api_get_tenant(tid):
