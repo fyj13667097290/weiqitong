@@ -104,6 +104,27 @@ fs.writeFileSync(
 
 console.log(`✅ 生成完成！`);
 console.log(`   文件数: ${countFiles(outputDir)}`);
+// 安全检查：扫描 {{}} 中的 < 符号
+function scanForBadExpr(dir) {
+  const issues = [];
+  const entries = fs.readdirSync(dir, { withFileTypes: true });
+  for (const e of entries) {
+    const fp = path.join(dir, e.name);
+    if (e.isDirectory()) { issues.push(...scanForBadExpr(fp)); }
+    else if (['.vue'].includes(path.extname(e.name))) {
+      const content = fs.readFileSync(fp, 'utf-8');
+      const ms = content.match(/\{\{[^}]*[<>][^}]*\}\}/g);
+      if (ms) issues.push(...ms.map(m => ({file: path.relative(outputDir, fp), expr: m.trim()})));
+    }
+  }
+  return issues;
+}
+const badExprs = scanForBadExpr(outputDir);
+if (badExprs.length) {
+  console.warn('\n⚠️  WXML 兼容警告：发现 {{}} 中使用了 < 或 > 符号，会导致编译失败：');
+  badExprs.forEach(b => console.warn(`   ${b.file}: ${b.expr}`));
+  console.warn('   修复方法：改用 computed 属性。详见 templates/driving/RULES.md\n');
+}
 console.log(`   请用微信开发者工具打开: ${outputDir}`);
 console.log(`   或者运行: npx yx-wechat-mini-cli --action upload`);
 
