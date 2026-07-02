@@ -545,12 +545,12 @@ th{color:#999;font-weight:500;font-size:13px;background:#fafafa}
   <a href="#" onclick="restoreTenant('{{t.id}}')" class="btn btn-sm" style="background:#52c41a;color:#fff;font-size:11px;padding:3px 8px;text-decoration:none;border-radius:3px">恢复</a>
   <a href="#" onclick="hardDelTenant('{{t.id}}','{{t.name}}')" class="btn btn-sm" style="background:#ff4d4f;color:#fff;font-size:11px;padding:3px 8px;text-decoration:none;border-radius:3px">彻底删除</a>
 {% else %}
-  <a href="/tenants/{{t.id}}/config" class="btn btn-primary btn-sm">配置</a>
-  <a href="#" onclick="authWx('{{t.id}}')" class="btn btn-sm" style="background:#722ed1;color:#fff;font-size:11px;padding:3px 8px;text-decoration:none;border-radius:3px">授权</a>
-  <a href="#" onclick="regWx('{{t.id}}','{{t.name}}')" class="btn btn-sm" style="background:#eb2f96;color:#fff;font-size:11px;padding:3px 8px;text-decoration:none;border-radius:3px">注册小程序</a>
-  <a href="/school/{{t.id}}/impersonate" class="btn btn-sm" style="background:#fa8c16;color:#fff;font-size:11px;padding:3px 8px;text-decoration:none;border-radius:3px">管理</a>
-  <a href="/school/{{t.id}}/login" target="_blank" class="btn btn-sm" style="background:#52c41a;color:#fff;font-size:11px;padding:3px 8px;text-decoration:none;border-radius:3px">自助后台</a>
-  <a href="#" onclick="copyLink('{{t.id}}')" class="btn btn-sm" style="background:#1890ff;color:#fff;font-size:11px;padding:3px 8px;text-decoration:none;border-radius:3px">复制链接</a>
+  <a href="/tenants/{{t.id}}/config" class="btn btn-primary btn-sm">① 配置</a>
+  <a href="#" onclick="regWx('{{t.id}}','{{t.name}}')" class="btn btn-sm" style="background:#eb2f96;color:#fff;font-size:11px;padding:3px 8px;text-decoration:none;border-radius:3px">② 注册小程序</a>
+  <a href="#" onclick="authWx('{{t.id}}')" class="btn btn-sm" style="background:#722ed1;color:#fff;font-size:11px;padding:3px 8px;text-decoration:none;border-radius:3px">② 授权</a>
+  <a href="/school/{{t.id}}/impersonate" class="btn btn-sm" style="background:#fa8c16;color:#fff;font-size:11px;padding:3px 8px;text-decoration:none;border-radius:3px">③ 管理</a>
+  <a href="/school/{{t.id}}/login" target="_blank" class="btn btn-sm" style="background:#52c41a;color:#fff;font-size:11px;padding:3px 8px;text-decoration:none;border-radius:3px">③ 自助后台</a>
+  <a href="#" onclick="copyLink('{{t.id}}')" class="btn btn-sm" style="background:#1890ff;color:#fff;font-size:11px;padding:3px 8px;text-decoration:none;border-radius:3px">🔗</a>
   <a href="#" onclick="delTenant('{{t.id}}','{{t.name}}')" class="btn btn-sm" style="background:#ff4d4f;color:#fff;font-size:11px;padding:3px 8px;text-decoration:none;border-radius:3px">删除</a>
 {% endif %}</td>
 </tr>{% endfor %}{% else %}<tr><td colspan="7" class="empty">{% if filter_status=='deleted' %}没有已删除的客户{% else %}还没有客户{% endif %}</td></tr>{% endif %}</tbody></table>
