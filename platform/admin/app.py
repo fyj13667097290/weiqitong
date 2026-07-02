@@ -324,8 +324,8 @@ textarea{resize:vertical;min-height:80px}
 
 <div class="btn-group">
   <button type="button" class="btn btn-primary" onclick="save()">💾 保存配置</button>
-  <button type="button" class="btn btn-success" onclick="generate()">⚙️ 生成</button>
-  <button type="button" class="btn btn-warn" onclick="deploy()">🚀 部署</button>
+  <button type="button" class="btn btn-success" onclick="generate()">⚙️ 生成代码</button>
+  <button type="button" class="btn btn-warn" onclick="deploy()">🚀 部署到微信</button>
   <button type="button" class="btn" onclick="submitAudit()" style="background:#722ed1;color:#fff">📝 提交审核</button>
   <button type="button" class="btn" onclick="releaseWx()" style="background:#13c2c2;color:#fff">🎉 发布上线</button>
 </div>
@@ -1167,8 +1167,16 @@ def handle_auth_callback(tid, auth_code):
     info = resp.get("authorization_info",{})
     if info:
         d = db()
+        appid = info.get("authorizer_appid","")
         d.execute("INSERT OR REPLACE INTO wechat_auths (tenant_id,authorizer_appid,authorizer_access_token,authorizer_refresh_token,authorized_at) VALUES (?,?,?,?,datetime('now'))",
-                  [tid, info.get("authorizer_appid",""), info.get("authorizer_access_token",""), info.get("authorizer_refresh_token","")])
+                  [tid, appid, info.get("authorizer_access_token",""), info.get("authorizer_refresh_token","")])
+        # 同步更新配置里的AppID
+        latest = d.execute("SELECT * FROM configs WHERE tenant_id=? ORDER BY version DESC LIMIT 1", [tid]).fetchone()
+        if latest:
+            cfg = json.loads(latest["config"])
+            cfg["school"]["appId"] = appid
+            d.execute("INSERT INTO configs (tenant_id,version,config,status,mini_appid) VALUES (?,?,?,?,?)",
+                      [tid, latest["version"]+1, json.dumps(cfg, ensure_ascii=False), "draft", appid])
         d.commit(); d.close()
 
 @app.route("/api/wechat/upload-code/<tid>", methods=["POST"])
