@@ -1214,6 +1214,20 @@ def wechat_submit_audit(tid):
         return jsonify({"error":resp.get("errmsg","提审失败"),"detail":resp})
     return jsonify({"ok":True,"auditid":resp.get("auditid"),"message":"审核已提交，预计1-7个工作日"})
 
+@app.route("/api/wechat/undocodeaudit/<tid>", methods=["POST"])
+@require_admin
+def wechat_undo_audit(tid):
+    """撤回审核"""
+    d = db()
+    auth = d.execute("SELECT * FROM wechat_auths WHERE tenant_id=?", [tid]).fetchone()
+    d.close()
+    if not auth: return jsonify({"error":"未授权"}), 400
+    token = auth["authorizer_access_token"]
+    resp = _requests.get(f"https://api.weixin.qq.com/wxa/undocodeaudit?access_token={token}").json()
+    if resp.get("errcode",0) != 0:
+        return jsonify({"error":resp.get("errmsg","撤回失败")})
+    return jsonify({"ok":True,"message":"已撤回审核"})
+
 @app.route("/api/wechat/release/<tid>", methods=["POST"])
 @require_admin
 def wechat_release(tid):
