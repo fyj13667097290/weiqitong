@@ -324,8 +324,10 @@ textarea{resize:vertical;min-height:80px}
 
 <div class="btn-group">
   <button type="button" class="btn btn-primary" onclick="save()">💾 保存配置</button>
-  <button type="button" class="btn btn-success" onclick="generate()">⚙️ 生成代码</button>
-  <button type="button" class="btn btn-warn" onclick="deploy()">🚀 部署到微信</button>
+  <button type="button" class="btn btn-success" onclick="generate()">⚙️ 生成</button>
+  <button type="button" class="btn btn-warn" onclick="deploy()">🚀 部署</button>
+  <button type="button" class="btn" onclick="submitAudit()" style="background:#722ed1;color:#fff">📝 提交审核</button>
+  <button type="button" class="btn" onclick="releaseWx()" style="background:#13c2c2;color:#fff">🎉 发布上线</button>
 </div>
 </div>
 
@@ -410,6 +412,19 @@ async function save(){
   log('✅ 配置已保存 (版本 v'+d.version+')');
 }
 
+async function submitAudit(){
+  await save();
+  var r=await fetch('/api/wechat/submit-audit/'+tid,{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});
+  var d=await r.json();
+  log(d.error||d.message||'提交审核请求已发出');
+  loadDeployments();
+}
+async function releaseWx(){
+  var r=await fetch('/api/wechat/release/'+tid,{method:'POST'});
+  var d=await r.json();
+  log(d.error||d.message||'发布请求已发出');
+  loadDeployments();
+}
 async function generate(){
   await save();
   log('⚙️ 正在生成小程序代码...');
