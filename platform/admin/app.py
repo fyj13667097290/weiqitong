@@ -937,6 +937,72 @@ def api_trigger_github(tid):
 
 # ==================== API: 健康检查 ====================
 
+# ==================== 付费页面 ====================
+
+PAY_PAGE = """<!DOCTYPE html><html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>升级套餐</title>
+<style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,sans-serif;background:#f0f2f5;min-height:100vh}
+.header{background:linear-gradient(135deg,#1e3a5f,#2563eb);color:#fff;text-align:center;padding:40px 20px}
+.header h1{font-size:28px}.header p{font-size:14px;opacity:.8;margin-top:8px}
+.container{max-width:500px;margin:-20px auto 0;padding:0 20px}
+.card{background:#fff;border-radius:12px;padding:24px;margin-bottom:16px;box-shadow:0 2px 12px rgba(0,0,0,.06);text-align:center}
+.plan-name{font-size:24px;font-weight:800;color:#1e3a5f}.plan-desc{font-size:13px;color:#999;margin:8px 0}
+.price{font-size:48px;font-weight:800;color:#ff4d4f}.price span{font-size:16px;font-weight:400}.price .yen{font-size:28px}
+.plan-features{text-align:left;margin:16px 0;font-size:14px;color:#666;line-height:2}
+.plan-features li{list-style:none}.plan-features li::before{content:'✅ '}
+.qr-section{display:flex;gap:16px;justify-content:center;flex-wrap:wrap}
+.qr-card{flex:1;min-width:140px;max-width:200px;text-align:center;background:#fafafa;padding:16px;border-radius:8px}
+.qr-card img{width:160px;height:160px;border-radius:4px;background:#fff;object-fit:contain}
+.qr-label{font-size:14px;font-weight:600;margin:8px 0 4px;color:#333}
+.qr-tip{font-size:12px;color:#999}
+.note{font-size:12px;color:#ff4d4f;margin-top:8px}
+.btn{display:block;width:100%;padding:12px;background:#2563eb;color:#fff;border:none;border-radius:8px;font-size:15px;cursor:pointer;font-weight:600;margin-top:12px;text-align:center;text-decoration:none}
+.btn-wx{background:#07c160}.btn-ali{background:#1677ff}
+.back{text-align:center;padding:20px;font-size:13px}.back a{color:#999;text-decoration:none}
+</style></head><body>
+<div class="header"><h1>🏭 微企通</h1><p>升级套餐，解锁更多功能</p></div>
+<div class="container">
+<div class="card">
+<div class="plan-name">{{plan_name}}</div>
+<div class="plan-desc">{{plan_desc}}</div>
+<div class="price"><span class="yen">¥</span>{{price}}<span>/年</span></div>
+<div style="font-size:12px;color:#999;margin-top:4px">14天免费试用中，到期前续费即可</div>
+</div>
+
+<div class="card">
+<h3 style="margin-bottom:16px;font-size:16px">📱 扫码支付</h3>
+<div class="qr-section">
+<div class="qr-card"><div style="width:160px;height:160px;background:#fff;margin:0 auto;display:flex;align-items:center;justify-content:center;border:2px dashed #07c160;border-radius:4px;font-size:13px;color:#07c160">微信<br>收款码</div><div class="qr-label">微信支付</div><div class="qr-tip">扫码支付 ¥{{price}}</div></div>
+<div class="qr-card"><div style="width:160px;height:160px;background:#fff;margin:0 auto;display:flex;align-items:center;justify-content:center;border:2px dashed #1677ff;border-radius:4px;font-size:13px;color:#1677ff">支付宝<br>收款码</div><div class="qr-label">支付宝</div><div class="qr-tip">扫码支付 ¥{{price}}</div></div>
+</div>
+<p class="note">⚠️ 付完请截图发给对接人员确认开通</p>
+</div>
+</div>
+<div class="back"><a href="javascript:history.back()">← 返回</a></div>
+</body></html>"""
+
+@app.route("/pay/<tid>")
+def customer_pay(tid):
+    d = db()
+    t = d.execute("SELECT * FROM tenants WHERE id=?",[tid]).fetchone()
+    if not t: d.close(); return "客户不存在", 404
+    price_map = {"basic":(999,"基础版","品牌展示+报名+预约"),"standard":(1999,"标准版","+教练端+数据+营销"),"pro":(2999,"专业版","+支付+合同+多场地")}
+    price, name, desc = price_map.get(t["plan"],(999,"基础版","品牌展示+在线报名"))
+    d.close()
+    return render_template_string(PAY_PAGE, price=price, plan_name=name, plan_desc=desc)
+
+@app.route("/admin/tenant/<tid>/mark-paid")
+@require_admin
+def admin_mark_paid(tid):
+    """管理员确认客户已付款，激活账户"""
+    d = db()
+    now_str = date.today().isoformat()
+    d.execute("UPDATE tenants SET status='active', trial_end=? WHERE id=?", [now_str, tid])
+    # 更新配置状态
+    d.execute("UPDATE configs SET status='deployed' WHERE tenant_id=? AND status='draft'", [tid])
+    d.commit(); d.close()
+    return redirect("/admin")
+
+# 在管理页面客户列表加付费按钮
 # ==================== 推广人管理 ====================
 
 PARTNER_PAGE = """<!DOCTYPE html><html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>推广人管理</title>
