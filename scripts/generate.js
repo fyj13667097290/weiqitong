@@ -23,7 +23,8 @@ if (!fs.existsSync(templateDir)) {
   process.exit(1);
 }
 
-console.log(`🔧 开始生成 ${config.school?.name || '未知驾校'} 的小程序...`);
+const displayName = config.school?.name || config.shop?.name || '未知商家';
+console.log(`🔧 开始生成 ${displayName} 的小程序...`);
 console.log(`   行业: ${industrySlug}`);
 console.log(`   模板: ${templateDir}`);
 console.log(`   输出: ${outputDir}`);
@@ -32,14 +33,21 @@ console.log(`   输出: ${outputDir}`);
 fs.cpSync(templateDir, outputDir, { recursive: true });
 
 // 3. 占位符映射
+const entity = config.school || config.shop || {};
 const placeholders = {
-  '{{school_name}}': config.school?.name || '',
-  '{{school_short_name}}': config.school?.shortName || config.school?.name || '',
-  '{{school_logo}}': config.school?.logo || '',
-  '{{school_phone}}': config.school?.phone || '',
-  '{{school_address}}': config.school?.address || '',
-  '{{school_description}}': config.school?.description || '',
-  '{{primary_color}}': config.school?.theme?.primaryColor || '#1890ff',
+  '{{school_name}}': entity.name || '',
+  '{{shop_name}}': entity.name || '',
+  '{{school_short_name}}': entity.shortName || entity.name || '',
+  '{{shop_short_name}}': entity.shortName || entity.name || '',
+  '{{school_logo}}': entity.logo || '',
+  '{{shop_logo}}': entity.logo || '',
+  '{{school_phone}}': entity.phone || '',
+  '{{shop_phone}}': entity.phone || '',
+  '{{school_address}}': entity.address || '',
+  '{{shop_address}}': entity.address || '',
+  '{{school_description}}': entity.description || '',
+  '{{shop_description}}': entity.description || '',
+  '{{primary_color}}': entity.theme?.primaryColor || '#1890ff',
 };
 
 // 4. 写入配置文件和替换占位符
@@ -53,7 +61,7 @@ const replaceInFile = (filePath) => {
     });
 
     // 替换 AppID
-    const appId = config.school?.appId || '';
+    const appId = entity.appId || '';
     content = content.split('__WEAPP_APPID__').join(appId);
 
     fs.writeFileSync(filePath, content);
@@ -92,8 +100,8 @@ fs.writeFileSync(configDest, JSON.stringify(config, null, 2), 'utf-8');
 
 // 6. 生成 project.config.json
 const projectConfig = {
-  appid: config.school?.appId || '',
-  projectname: config.school?.name || '驾校小程序',
+  appid: entity.appId || '',
+  projectname: entity.name || '小程序',
   miniprogramRoot: '',
   setting: { urlCheck: false, es6: true, postcss: true, minified: true },
 };

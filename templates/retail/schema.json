@@ -1,0 +1,37 @@
+{
+  "industry": "retail",
+  "version": "1.0.0",
+  "displayName": "零售行业模板",
+  "description": "适用于零售门店的微信小程序：商品展示、在线下单、购物车、订单追踪",
+  "fields": {
+    "shop": {
+      "type": "object",
+      "label": "店铺信息",
+      "fields": {
+        "name": { "type": "string", "label": "店铺名称", "required": true },
+        "shortName": { "type": "string", "label": "简称", "maxLength": 10 },
+        "logo": { "type": "image", "label": "Logo" },
+        "phone": { "type": "phone", "label": "联系电话" },
+        "address": { "type": "text", "label": "店铺地址" },
+        "description": { "type": "textarea", "label": "店铺简介" },
+        "photos": { "type": "imageList", "label": "门头照", "maxItems": 3 },
+        "theme": { "type": "object", "label": "主题配色", "fields": { "primaryColor": { "type": "color", "label": "主色调", "default": "#ff6b35" } } }
+      }
+    },
+    "products": {
+      "type": "array", "label": "商品管理",
+      "itemSchema": {
+        "name": { "type": "string", "label": "商品名称" },
+        "price": { "type": "number", "label": "价格" },
+        "image": { "type": "image", "label": "商品图片" },
+        "category": { "type": "string", "label": "分类" },
+        "stock": { "type": "number", "label": "库存" },
+        "tag": { "type": "string", "label": "标签", "placeholder": "新品/热销/特价" }
+      }
+    },
+    "features": {
+      "type": "object", "label": "功能开关",
+      "fields": { "cart": { "type": "boolean", "label": "购物车", "default": true }, "orderTracking": { "type": "boolean", "label": "订单追踪", "default": true } }
+    }
+  }
+}
