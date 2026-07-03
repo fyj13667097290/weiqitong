@@ -263,7 +263,7 @@ input,select,textarea{width:100%;padding:10px 12px;border:1px solid #d9d9d9;bord
 <div class="form-group"><label>简称</label><input name="short_name" placeholder="如：鑫达驾校" maxlength="10"></div>
 <div class="form-group"><label>联系人</label><input name="contact_name" placeholder="驾校老板姓名"></div>
 <div class="form-group"><label>联系电话</label><input name="contact_phone" placeholder="手机号"></div>
-<div class="form-group"><label>行业</label><select name="industry_id">{% for ind in industries %}<option value="{{ind.id}}">{{ind.icon}} {{ind.name}}</option>{% endfor %}</select></div>
+<div class="form-group"><label>行业</label><select name="industry_id">{% for ind in industries %}<option value="{{ind.id}}" {% if preselected_industry==ind.id %}selected{% endif %}>{{ind.icon}} {{ind.name}}</option>{% endfor %}</select></div>
 <div class="form-group"><label>套餐</label><select name="plan"><option value="trial">试用版（免费14天）</option><option value="basic">基础版 999元/年</option><option value="standard">标准版 1999元/年</option><option value="pro">专业版 2999元/年</option></select></div>
 <div class="form-group"><label>推广人</label><select name="referrer_id"><option value="">无</option>{% for r in referrers %}<option value="{{r.id}}" {% if preselected_ref==r.id %}selected{% endif %}>{{r.name}} ({{r.phone or ''}})</option>{% endfor %}</select></div>
 <button type="submit" class="btn btn-primary">创建客户</button></form></div></div></body></html>"""
@@ -582,7 +582,7 @@ th{color:#999;font-weight:500;font-size:13px;background:#fafafa}
 <div class="stat"><div class="num">{{stats.industries}}</div><div class="label">行业模板</div></div>
 </div>
 <div class="card">
-<h2>客户列表 <a href="/new" class="btn btn-primary" style="float:right">+ 添加客户</a></h2>
+<h2>客户列表 <a href="/new{% if current_industry %}?industry={{current_industry}}{% endif %}" class="btn btn-primary" style="float:right">+ 添加客户</a></h2>
 <table><thead><tr><th>名称</th><th>行业</th><th>套餐</th><th>状态</th><th>推广人</th><th>创建</th><th>操作</th></tr></thead>
 <tbody>{% if tenants %}{% for t in tenants %}<tr>
 <td><strong>{{t.name}}</strong></td><td>{{t.industry_name or '-'}}</td>
@@ -829,8 +829,9 @@ def new_tenant():
     if ref_code:
         ref = d.execute("SELECT id FROM referrers WHERE code=? AND role='agent' AND is_active=1",[ref_code]).fetchone()
         if ref: preselected = ref["id"]
+    preselected_industry = request.args.get("industry","")
     d.close()
-    return render_template_string(HTML_NEW, industries=industries, referrers=referrers, preselected_ref=preselected)
+    return render_template_string(HTML_NEW, industries=industries, referrers=referrers, preselected_ref=preselected, preselected_industry=preselected_industry)
 
 @app.route("/tenants/<tid>/config")
 @require_admin
@@ -1310,7 +1311,6 @@ th{color:#999;font-weight:500}.empty{text-align:center;color:#bbb;padding:20px}
 <div class="header"><h2>🏫 {{tenant.name}}</h2><div><a href="/school/{{tenant.id}}/password" style="color:#94a3b8;text-decoration:none;font-size:13px;margin-right:16px">修改密码</a><a href="/school/{{tenant.id}}/login">退出</a></div></div>
 <div class="container">
 
-{% if industry_slug=='driving' %}
 <div class="card"><h3>💳 升级套餐 <a href="/pay/{{tenant.id}}" target="_blank">立即付费</a></h3>
 <p style="font-size:13px;color:#666">当前: {{tenant.plan}} · 状态: {{tenant.status}}</p></div>
 
@@ -1344,13 +1344,6 @@ th{color:#999;font-weight:500}.empty{text-align:center;color:#bbb;padding:20px}
 <div class="card"><h3>👥 招生老师 <a href="/school/{{tenant.id}}/referrers">管理</a></h3>
 <p style="font-size:13px;color:#666">管理招生老师账号，查看各渠道推荐数据</p></div>
 
-{% if industry_slug in ('retail','restaurant','beauty') %}
-<div class="card"><h3>📂 商品类目 <a href="/school/{{tenant.id}}/categories">管理</a></h3><p style="font-size:13px;color:#666">自定义商品分类</p></div>
-{% endif %}
-
-{% elif industry_slug in ('retail','restaurant','beauty') %}
-<div class="card"><h3>📂 商品类目 <a href="/school/{{tenant.id}}/categories">管理</a></h3><p style="font-size:13px;color:#666">自定义商品分类</p></div>
-{% endif %}
 <div class="card"><h3>📋 最近预约</h3>
 {% if appointments %}<table><tr><th>学员</th><th>电话</th><th>课程</th><th>时间</th><th>状态</th><th>操作</th></tr>
 {% for a in appointments %}<tr><td>{{a.student_name}}</td><td>{{a.student_phone}}</td><td>{{a.course_type}}</td><td>{{a.appointment_time}}</td><td><span class="tag tag-{{a.status}}">{{a.status}}</span></td>
