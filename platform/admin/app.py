@@ -1105,8 +1105,10 @@ th{color:#999;font-weight:500}.money{color:#52c41a;font-weight:700}.empty{text-a
 <p style="font-size:16px;word-break:break-all;margin:8px 0;background:#f0f5ff;padding:10px;border-radius:6px">{{link}}</p>
 <p style="font-size:12px;color:#999">发给客户打开，系统自动记录你推荐的客户</p></div>
 <div class="card"><h3 style="text-align:left;margin-bottom:12px">客户明细</h3>
-{% if clients %}<table><tr><th>客户</th><th>套餐</th><th>年费</th><th>佣金率</th><th>佣金</th></tr>
-{% for c in clients %}<tr><td>{{c.name}}</td><td>{{c.plan}}</td><td>¥{{c.price}}</td><td>{{c.rate}}%</td><td class="money">¥{{c.commission}}</td></tr>{% endfor %}</table>
+{% if clients %}<table><tr><th>客户</th><th>套餐</th><th>年费</th><th>佣金率</th><th>佣金</th><th>付费</th></tr>
+{% for c in clients %}<tr><td>{{c.name}}</td><td>{{c.plan}}</td><td>¥{{c.price}}</td><td>{{c.rate}}%</td><td class="money">¥{{c.commission}}</td>
+<td><a href="/pay/{{c.tid}}" target="_blank" style="color:#ff9800;text-decoration:none;font-weight:600;font-size:12px">付</a></td>
+</tr>{% endfor %}</table>
 {% else %}<p class="empty">还没有推荐客户</p>{% endif %}</div>
 </div></body></html>"""
 
@@ -1161,7 +1163,7 @@ def partner_dashboard():
                 if (_time.time()-_time.mktime(_time.strptime(c["created_at"][:10],"%Y-%m-%d")))/86400/30>12: r=rate//2
             except: pass
         comm = int(price*r/100); total += comm
-        cl.append({"name":c["name"],"plan":c["plan"],"price":price,"rate":r,"commission":comm})
+        cl.append({"name":c["name"],"plan":c["plan"],"price":price,"rate":r,"commission":comm,"tid":c["id"]})
     d.close()
     ref_code = p["code"]
     ref_link = f"https://jiaxiao.t-hub.cc/ref/{ref_code}"
