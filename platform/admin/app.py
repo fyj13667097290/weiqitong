@@ -71,6 +71,32 @@ def wx_get_authorizer_info(authorizer_appid):
     }).json()
     return resp
 
+def wx_get_authorizer_token(tid):
+    """获取可用的 authorizer_access_token（过期自动刷新）"""
+    d = db()
+    auth = d.execute("SELECT * FROM wechat_auths WHERE tenant_id=?", [tid]).fetchone()
+    if not auth: d.close(); return None
+    token = auth["authorizer_access_token"]
+    # 测试 token 是否可用，不可用则刷新
+    test = _requests.post(f"https://api.weixin.qq.com/wxa/get_latest_auditstatus?access_token={token}", json={}).json()
+    if test.get("errcode") == 42001:
+        comp_token = wx_get_component_token()
+        if comp_token:
+            refresh = _requests.post(f"https://api.weixin.qq.com/cgi-bin/component/api_authorizer_token?component_access_token={comp_token}", json={
+                "component_appid": WX_COMPONENT_APPID,
+                "authorizer_appid": auth["authorizer_appid"],
+                "authorizer_refresh_token": auth["authorizer_refresh_token"]
+            }).json()
+            new_token = refresh.get("authorizer_access_token","")
+            new_refresh = refresh.get("authorizer_refresh_token","")
+            if new_token:
+                d.execute("UPDATE wechat_auths SET authorizer_access_token=?,authorizer_refresh_token=? WHERE tenant_id=?",
+                          [new_token, new_refresh or auth["authorizer_refresh_token"], tid])
+                d.commit()
+                token = new_token
+    d.close()
+    return token
+
 # ==================== 微信回调 ====================
 
 @app.route("/wechat/callback", methods=["GET","POST"])
@@ -239,6 +265,7 @@ input,select,textarea{width:100%;padding:10px 12px;border:1px solid #d9d9d9;bord
 <div class="form-group"><label>联系电话</label><input name="contact_phone" placeholder="手机号"></div>
 <div class="form-group"><label>行业</label><select name="industry_id">{% for ind in industries %}<option value="{{ind.id}}">{{ind.icon}} {{ind.name}}</option>{% endfor %}</select></div>
 <div class="form-group"><label>套餐</label><select name="plan"><option value="trial">试用版（免费14天）</option><option value="basic">基础版 999元/年</option><option value="standard">标准版 1999元/年</option><option value="pro">专业版 2999元/年</option></select></div>
+<div class="form-group"><label>推广人</label><select name="referrer_id"><option value="">无</option>{% for r in referrers %}<option value="{{r.id}}">{{r.name}} ({{r.phone or ''}})</option>{% endfor %}</select></div>
 <button type="submit" class="btn btn-primary">创建客户</button></form></div></div></body></html>"""
 
 HTML_CONFIG = """<!DOCTYPE html><html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>驾校配置</title>
@@ -535,7 +562,7 @@ th{color:#999;font-weight:500;font-size:13px;background:#fafafa}
 .filter-bar{display:flex;gap:8px;margin-bottom:16px}
 .filter-item{padding:6px 14px;border-radius:16px;background:#fff;color:#666;text-decoration:none;font-size:12px;font-weight:500;box-shadow:0 1px 2px rgba(0,0,0,.05)}
 .filter-item.active{background:#1e293b;color:#fff}</style></head><body>
-<div class="header"><h1>🏭 微企通 · 管理后台</h1></div>
+<div class="header"><h1>🏭 微企通 · 管理后台</h1><div><a href="/admin/partners" style="color:#94a3b8;text-decoration:none;font-size:13px">推广人管理</a></div></div>
 <div class="container">
 <div class="industry-bar">
   <a href="/admin" class="ind-item {% if not current_industry %}active{% endif %}">📊 全部</a>
@@ -698,8 +725,9 @@ def index():
 def new_tenant():
     d = db()
     industries = d.execute("SELECT * FROM industries WHERE is_active=1 ORDER BY sort_order,id").fetchall()
+    referrers = d.execute("SELECT * FROM referrers WHERE role='agent' AND is_active=1").fetchall()
     d.close()
-    return render_template_string(HTML_NEW, industries=industries)
+    return render_template_string(HTML_NEW, industries=industries, referrers=referrers)
 
 @app.route("/tenants/<tid>/config")
 @require_admin
@@ -724,11 +752,12 @@ def api_create_tenant():
     data = request.form
     tid = f"t{datetime.now().strftime('%Y%m%d%H%M%S')}{uuid.uuid4().hex[:4]}"
     d = db()
-    d.execute("INSERT INTO tenants (id,name,short_name,industry_id,contact_name,contact_phone,status,plan,trial_end) VALUES (?,?,?,?,?,?,?,?,?)",
+    rid = data.get("referrer_id","") or None
+    d.execute("INSERT INTO tenants (id,name,short_name,industry_id,contact_name,contact_phone,status,plan,trial_end,referrer_id) VALUES (?,?,?,?,?,?,?,?,?,?)",
               [tid, data["name"], data.get("short_name",""), data.get("industry_id","drv001"),
                data.get("contact_name",""), data.get("contact_phone",""),
                "trial", data.get("plan","trial"),
-               (date.today() + timedelta(days=14)).isoformat()])
+               (date.today() + timedelta(days=14)).isoformat(), rid])
     d.commit(); d.close()
     return render_template_string("""<html><body><script>alert('客户创建成功！');location.href='/admin'</script></body></html>"""), 201
 
@@ -835,12 +864,11 @@ def api_deploy(tid):
 
     # 2. 如果有微信授权，通过模板上传代码
     if result == "generated" and action == "upload":
-        auth = d.execute("SELECT * FROM wechat_auths WHERE tenant_id=?", [tid]).fetchone()
-        if auth:
+        token = wx_get_authorizer_token(tid)
+        if token:
             try:
-                token = auth["authorizer_access_token"]
                 # 用ext_json方式直接提交（不需要预存模板）
-                ext = {"extEnable": True, "extAppid": auth["authorizer_appid"], "directCommit": True}
+                ext = {"extEnable": True, "extAppid": config["mini_appid"] or cfg["config"]["school"]["appId"] or "", "directCommit": True}
                 resp = _requests.post(f"https://api.weixin.qq.com/wxa/commit?access_token={token}", json={
                     "template_id": 0,
                     "ext_json": json.dumps(ext, ensure_ascii=False),
@@ -903,6 +931,136 @@ def api_trigger_github(tid):
         return jsonify({"ok": False, "message": str(e)}), 500
 
 # ==================== API: 健康检查 ====================
+
+# ==================== 推广人管理 ====================
+
+PARTNER_PAGE = """<!DOCTYPE html><html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>推广人管理</title>
+<style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,sans-serif;background:#f0f2f5}
+.header{background:#1e293b;color:#fff;padding:12px 20px;display:flex;justify-content:space-between}
+.header h2{font-size:16px}.header a{color:#94a3b8;text-decoration:none;font-size:13px}
+.container{max-width:1000px;margin:0 auto;padding:20px}
+.card{background:#fff;border-radius:8px;padding:20px;margin-bottom:16px;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+h3{font-size:16px;margin-bottom:14px;display:flex;justify-content:space-between}
+table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:8px 10px;text-align:left;border-bottom:1px solid #f0f0f0}
+th{color:#999;font-weight:500}.empty{text-align:center;color:#bbb;padding:20px}
+.money{color:#52c41a;font-weight:700}
+.inp{padding:8px;border:1px solid #d9d9d9;border-radius:4px;flex:1;min-width:80px;font-size:13px}
+.row{display:flex;gap:10px;align-items:end;flex-wrap:wrap}
+.btn{padding:8px 16px;background:#667eea;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:13px;white-space:nowrap}
+.btn-del{background:#ff4d4f}
+</style></head><body>
+<div class="header"><h2>推广人管理</h2><a href="/admin">返回</a></div>
+<div class="container">
+{% for p in partners %}
+<div class="card"><h3>{{p.name}} ({{p.phone or '-'}}) · 佣金率:{{p.commission_rate}}% · 已赚:<span class="money">¥{{p.total_commission or 0}}</span>
+<a class="btn btn-del" href="/admin/partner/{{p.id}}/delete" onclick="return confirm('确定删除？')" style="font-size:11px;padding:3px 8px;margin-left:8px;color:#fff;text-decoration:none">删除</a></h3>
+{% if p.clients %}<table><tr><th>客户</th><th>套餐</th><th>类型</th><th>佣金</th><th>时间</th></tr>
+{% for c in p.clients %}<tr><td>{{c.name}}</td><td>{{c.plan}}</td><td>{{c.year_type}}</td><td class="money">¥{{c.commission}}</td><td>{{c.created_at[:10]}}</td></tr>{% endfor %}</table>
+{% else %}<p class="empty">暂无客户</p>{% endif %}</div>
+{% endfor %}
+<div class="card"><h3>+ 添加推广人</h3>
+<form method="POST" action="/admin/partner/new" class="row">
+<input name="name" placeholder="姓名" required class="inp"><input name="phone" placeholder="电话" class="inp">
+<input name="password" placeholder="密码" value="123456" class="inp" style="max-width:80px">
+<input name="commission_rate" placeholder="佣金%" type="number" value="20" class="inp" style="max-width:80px">
+<button class="btn" type="submit">添加</button></form></div>
+</div></body></html>"""
+
+@app.route("/admin/partners")
+@require_admin
+def admin_partners():
+    d = db()
+    partners = d.execute("SELECT * FROM referrers WHERE role='agent' AND is_active=1 ORDER BY created_at DESC").fetchall()
+    pd_list = []
+    for p in partners:
+        pd = dict(p)
+        clients = d.execute("SELECT * FROM tenants WHERE referrer_id=? AND status!='inactive' ORDER BY created_at DESC", [p["id"]]).fetchall()
+        cl = []; total = 0; rate = p["commission_rate"] or 20
+        for c in clients:
+            yt = "首年"; r = rate
+            if c["created_at"]:
+                try:
+                    ts = _time.mktime(_time.strptime(c["created_at"][:10],"%Y-%m-%d"))
+                    if (_time.time()-ts)/86400/30 > 12: yt = "续费"; r = rate//2
+                except: pass
+            price = {"basic":999,"standard":1999,"pro":2999,"trial":0}.get(c["plan"],999)
+            comm = int(price*r/100); total += comm
+            cl.append({"name":c["name"],"plan":c["plan"],"year_type":yt,"commission":comm,"created_at":c["created_at"]})
+        pd["clients"] = cl; pd["total_commission"] = total; pd_list.append(pd)
+    d.close()
+    return render_template_string(PARTNER_PAGE, partners=pd_list)
+
+@app.route("/admin/partner/new", methods=["POST"])
+@require_admin
+def admin_partner_new():
+    d = db(); import random, string
+    code = ''.join(random.choices(string.ascii_letters+string.digits, k=8))
+    d.execute("INSERT INTO referrers (name,phone,password,code,commission_rate,role,is_active) VALUES (?,?,?,?,?,?,1)",
+              [request.form["name"],request.form.get("phone",""),request.form.get("password","123456"),code,int(request.form.get("commission_rate",20)),"agent"])
+    d.commit(); d.close()
+    return redirect("/admin/partners")
+
+@app.route("/admin/partner/<int:pid>/delete")
+@require_admin
+def admin_partner_delete(pid):
+    d = db(); d.execute("UPDATE referrers SET is_active=0 WHERE id=?",[pid]); d.commit(); d.close()
+    return redirect("/admin/partners")
+
+PARTNER_LOGIN = """<!DOCTYPE html><html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>推广人登录</title>
+<style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,sans-serif;background:linear-gradient(135deg,#667eea,#764ba2);min-height:100vh;display:flex;align-items:center;justify-content:center}
+.card{background:#fff;border-radius:16px;padding:40px;width:90%;max-width:360px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.2)}
+h2{font-size:20px;margin-bottom:8px}.sub{color:#999;font-size:13px;margin-bottom:20px}
+input{width:100%;padding:12px;border:1px solid #d9d9d9;border-radius:8px;font-size:15px;margin-bottom:12px;text-align:center}
+.btn{width:100%;padding:12px;background:#667eea;color:#fff;border:none;border-radius:8px;font-size:15px;cursor:pointer;font-weight:600}
+.err{color:#ff4d4f;font-size:12px;margin-bottom:8px}</style></head><body>
+<div class="card"><h2>佣金查询</h2><p class="sub">推广人登录</p>
+<form method="POST"><input name="phone" placeholder="手机号" required><input name="password" placeholder="密码"><button class="btn" type="submit">登录</button></form>
+<p class="err">{{error or ''}}</p></div></body></html>"""
+
+PARTNER_DASHBOARD = """<!DOCTYPE html><html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>我的佣金</title>
+<style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,sans-serif;background:#f0f2f5}
+.header{background:#1e293b;color:#fff;padding:12px 20px}.header h2{font-size:16px}
+.container{max-width:600px;margin:0 auto;padding:20px}
+.card{background:#fff;border-radius:8px;padding:20px;margin-bottom:16px;text-align:center}
+.big-num{font-size:48px;font-weight:800;color:#52c41a}.big-label{color:#999;font-size:14px;margin-top:4px}
+table{width:100%;border-collapse:collapse;font-size:13px;margin-top:16px}th,td{padding:8px 10px;text-align:left;border-bottom:1px solid #f0f0f0}
+th{color:#999;font-weight:500}.money{color:#52c41a;font-weight:700}.empty{text-align:center;color:#bbb;padding:20px}
+</style></head><body><div class="header"><h2>我的佣金</h2></div><div class="container">
+<div class="card"><div class="big-num">¥{{total}}</div><div class="big-label">累计佣金</div></div>
+<div class="card"><h3 style="text-align:left;margin-bottom:12px">客户明细</h3>
+{% if clients %}<table><tr><th>客户</th><th>套餐</th><th>年费</th><th>佣金率</th><th>佣金</th></tr>
+{% for c in clients %}<tr><td>{{c.name}}</td><td>{{c.plan}}</td><td>¥{{c.price}}</td><td>{{c.rate}}%</td><td class="money">¥{{c.commission}}</td></tr>{% endfor %}</table>
+{% else %}<p class="empty">还没有推荐客户</p>{% endif %}</div>
+</div></body></html>"""
+
+@app.route("/partner/login", methods=["GET","POST"])
+def partner_login():
+    error = None
+    if request.method == "POST":
+        d = db(); p = d.execute("SELECT * FROM referrers WHERE phone=? AND role='agent' AND is_active=1",[request.form["phone"]]).fetchone(); d.close()
+        if p and p["password"]==request.form.get("password",""):
+            resp = redirect("/partner/dashboard"); resp.set_cookie("partner_id",str(p["id"]),max_age=86400*7); return resp
+        error = "手机号或密码错误"
+    return render_template_string(PARTNER_LOGIN, error=error)
+
+@app.route("/partner/dashboard")
+def partner_dashboard():
+    pid = request.cookies.get("partner_id","");
+    if not pid: return redirect("/partner/login")
+    d = db(); p = d.execute("SELECT * FROM referrers WHERE id=?",[int(pid)]).fetchone()
+    if not p: d.close(); return redirect("/partner/login")
+    clients = d.execute("SELECT * FROM tenants WHERE referrer_id=? AND status!='inactive'",[int(pid)]).fetchall()
+    cl = []; total = 0; rate = p["commission_rate"] or 20
+    for c in clients:
+        price = {"basic":999,"standard":1999,"pro":2999,"trial":0}.get(c["plan"],999); r = rate
+        if c["created_at"]:
+            try:
+                if (_time.time()-_time.mktime(_time.strptime(c["created_at"][:10],"%Y-%m-%d")))/86400/30>12: r=rate//2
+            except: pass
+        comm = int(price*r/100); total += comm
+        cl.append({"name":c["name"],"plan":c["plan"],"price":price,"rate":r,"commission":comm})
+    d.close()
+    return render_template_string(PARTNER_DASHBOARD, total=total, clients=cl)
 
 @app.route("/debug/wx")
 def debug_wx():
@@ -1191,9 +1349,8 @@ def handle_auth_callback(tid, auth_code):
 def wechat_upload_code(tid):
     """上传代码到授权小程序"""
     d = db()
-    auth = d.execute("SELECT * FROM wechat_auths WHERE tenant_id=?", [tid]).fetchone()
-    if not auth: d.close(); return jsonify({"error":"该驾校尚未授权，请先生成授权链接"}), 400
-    token = auth["authorizer_access_token"]
+    token = wx_get_authorizer_token(tid)
+    if not token: d.close(); return jsonify({"error":"该驾校尚未授权或token获取失败"}), 400
     config = d.execute("SELECT * FROM configs WHERE tenant_id=? ORDER BY version DESC LIMIT 1", [tid]).fetchone()
     d.close()
     if not config: return jsonify({"error":"请先保存小程序配置"}), 400
@@ -1227,11 +1384,8 @@ def wechat_upload_code(tid):
 @require_admin
 def wechat_submit_audit(tid):
     """提交代码审核"""
-    d = db()
-    auth = d.execute("SELECT * FROM wechat_auths WHERE tenant_id=?", [tid]).fetchone()
-    d.close()
-    if not auth: return jsonify({"error":"该驾校尚未授权"}), 400
-    token = auth["authorizer_access_token"]
+    token = wx_get_authorizer_token(tid)
+    if not token: return jsonify({"error":"该驾校尚未授权"}), 400
 
     data = request.get_json() or {}
     item_list = data.get("item_list", [
@@ -1248,11 +1402,8 @@ def wechat_submit_audit(tid):
 @require_admin
 def wechat_undo_audit(tid):
     """撤回审核"""
-    d = db()
-    auth = d.execute("SELECT * FROM wechat_auths WHERE tenant_id=?", [tid]).fetchone()
-    d.close()
-    if not auth: return jsonify({"error":"未授权"}), 400
-    token = auth["authorizer_access_token"]
+    token = wx_get_authorizer_token(tid)
+    if not token: return jsonify({"error":"未授权"}), 400
     resp = _requests.get(f"https://api.weixin.qq.com/wxa/undocodeaudit?access_token={token}").json()
     if resp.get("errcode",0) != 0:
         return jsonify({"error":resp.get("errmsg","撤回失败")})
@@ -1262,11 +1413,8 @@ def wechat_undo_audit(tid):
 @require_admin
 def wechat_release(tid):
     """发布已审核通过的小程序"""
-    d = db()
-    auth = d.execute("SELECT * FROM wechat_auths WHERE tenant_id=?", [tid]).fetchone()
-    d.close()
-    if not auth: return jsonify({"error":"未授权"}), 400
-    token = auth["authorizer_access_token"]
+    token = wx_get_authorizer_token(tid)
+    if not token: return jsonify({"error":"未授权"}), 400
     resp = _requests.post(f"https://api.weixin.qq.com/wxa/release?access_token={token}", json={}).json()
     if resp.get("errcode",0) != 0:
         return jsonify({"error":resp.get("errmsg","发布失败"),"detail":resp})
