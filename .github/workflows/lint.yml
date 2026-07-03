@@ -17,30 +17,30 @@ jobs:
 
       - name: 扫描WXML不兼容语法
         run: |
-          echo "🔍 正在扫描 .vue 文件中 {{}} 里的 < 和 > 符号..."
-          BAD=0
-          find templates -name "*.vue" | while read f; do
-            VIOLATIONS=$(grep -n '\{\{[^}]*[<>][^}]*\}\}' "$f" 2>/dev/null || true)
-            if [ -n "$VIOLATIONS" ]; then
-              echo ""
-              echo "❌ $f"
-              echo "$VIOLATIONS" | while read line; do
-                echo "   $line"
-              done
-              BAD=1
-            fi
-          done
-          if [ "$BAD" -eq 1 ]; then
-            echo ""
-            echo "══════════════════════════════════════"
-            echo "⚠️  发现 WXML 不兼容写法！"
-            echo "   把 {{}} 中的 < 或 > 改为 computed 属性"
-            echo "   详见 templates/driving/RULES.md"
-            echo "══════════════════════════════════════"
-            exit 1
-          else
-            echo "✅ 所有模板检查通过"
-          fi
+          echo "🔍 扫描 {{}} 中 < > 符号..."
+          python3 -c "
+import os, sys
+bad = 0
+for root, dirs, files in os.walk('templates'):
+    for f in files:
+        if f.endswith('.vue'):
+            fp = os.path.join(root, f)
+            for i, line in enumerate(open(fp, encoding='utf-8'), 1):
+                import re
+                if re.search(r'\{\{[^}]*[<>][^}]*\}\}', line):
+                    if not bad: print()
+                    print(f'❌ {fp}:{i}  {line.strip()[:80]}')
+                    bad += 1
+if bad:
+    print()
+    print('═'*50)
+    print(f'⚠️  发现 {bad} 处 WXML 不兼容写法')
+    print('   改用 computed 属性，详见 RULES.md')
+    print('═'*50)
+    sys.exit(1)
+else:
+    print('✅ 通过')
+"
 
       - name: 数据库备份检查
         run: |
