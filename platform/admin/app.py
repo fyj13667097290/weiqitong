@@ -265,7 +265,7 @@ input,select,textarea{width:100%;padding:10px 12px;border:1px solid #d9d9d9;bord
 <div class="form-group"><label>联系电话</label><input name="contact_phone" placeholder="手机号"></div>
 <div class="form-group"><label>行业</label><select name="industry_id">{% for ind in industries %}<option value="{{ind.id}}">{{ind.icon}} {{ind.name}}</option>{% endfor %}</select></div>
 <div class="form-group"><label>套餐</label><select name="plan"><option value="trial">试用版（免费14天）</option><option value="basic">基础版 999元/年</option><option value="standard">标准版 1999元/年</option><option value="pro">专业版 2999元/年</option></select></div>
-<div class="form-group"><label>推广人</label><select name="referrer_id"><option value="">无</option>{% for r in referrers %}<option value="{{r.id}}">{{r.name}} ({{r.phone or ''}})</option>{% endfor %}</select></div>
+<div class="form-group"><label>推广人</label><select name="referrer_id"><option value="">无</option>{% for r in referrers %}<option value="{{r.id}}" {% if preselected_ref==r.id %}selected{% endif %}>{{r.name}} ({{r.phone or ''}})</option>{% endfor %}</select></div>
 <button type="submit" class="btn btn-primary">创建客户</button></form></div></div></body></html>"""
 
 HTML_CONFIG = """<!DOCTYPE html><html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>驾校配置</title>
@@ -726,8 +726,13 @@ def new_tenant():
     d = db()
     industries = d.execute("SELECT * FROM industries WHERE is_active=1 ORDER BY sort_order,id").fetchall()
     referrers = d.execute("SELECT * FROM referrers WHERE role='agent' AND is_active=1").fetchall()
+    ref_code = request.cookies.get("ref_code","")
+    preselected = None
+    if ref_code:
+        ref = d.execute("SELECT id FROM referrers WHERE code=? AND role='agent' AND is_active=1",[ref_code]).fetchone()
+        if ref: preselected = ref["id"]
     d.close()
-    return render_template_string(HTML_NEW, industries=industries, referrers=referrers)
+    return render_template_string(HTML_NEW, industries=industries, referrers=referrers, preselected_ref=preselected)
 
 @app.route("/tenants/<tid>/config")
 @require_admin
@@ -1027,6 +1032,9 @@ table{width:100%;border-collapse:collapse;font-size:13px;margin-top:16px}th,td{p
 th{color:#999;font-weight:500}.money{color:#52c41a;font-weight:700}.empty{text-align:center;color:#bbb;padding:20px}
 </style></head><body><div class="header"><h2>我的佣金</h2></div><div class="container">
 <div class="card"><div class="big-num">¥{{total}}</div><div class="big-label">累计佣金</div></div>
+<div class="card" style="text-align:left"><p style="font-size:14px;color:#666">你的专属推广链接：</p>
+<p style="font-size:16px;word-break:break-all;margin:8px 0;background:#f0f5ff;padding:10px;border-radius:6px">{{link}}</p>
+<p style="font-size:12px;color:#999">发给客户打开，系统自动记录你推荐的客户</p></div>
 <div class="card"><h3 style="text-align:left;margin-bottom:12px">客户明细</h3>
 {% if clients %}<table><tr><th>客户</th><th>套餐</th><th>年费</th><th>佣金率</th><th>佣金</th></tr>
 {% for c in clients %}<tr><td>{{c.name}}</td><td>{{c.plan}}</td><td>¥{{c.price}}</td><td>{{c.rate}}%</td><td class="money">¥{{c.commission}}</td></tr>{% endfor %}</table>
@@ -1042,6 +1050,15 @@ def partner_login():
             resp = redirect("/partner/dashboard"); resp.set_cookie("partner_id",str(p["id"]),max_age=86400*7); return resp
         error = "手机号或密码错误"
     return render_template_string(PARTNER_LOGIN, error=error)
+
+@app.route("/ref/<code>")
+def partner_ref(code):
+    """推广链接落地页：记录cookie后跳转"""
+    d = db(); p = d.execute("SELECT * FROM referrers WHERE code=? AND role='agent' AND is_active=1",[code]).fetchone(); d.close()
+    if not p: return "推广链接无效", 404
+    resp = redirect("/admin")
+    resp.set_cookie("ref_code", code, max_age=86400*30)
+    return resp
 
 @app.route("/partner/dashboard")
 def partner_dashboard():
@@ -1060,7 +1077,9 @@ def partner_dashboard():
         comm = int(price*r/100); total += comm
         cl.append({"name":c["name"],"plan":c["plan"],"price":price,"rate":r,"commission":comm})
     d.close()
-    return render_template_string(PARTNER_DASHBOARD, total=total, clients=cl)
+    ref_code = p["code"]
+    ref_link = f"https://jiaxiao.t-hub.cc/ref/{ref_code}"
+    return render_template_string(PARTNER_DASHBOARD, total=total, clients=cl, code=ref_code, link=ref_link)
 
 @app.route("/debug/wx")
 def debug_wx():
