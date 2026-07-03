@@ -959,6 +959,7 @@ th{color:#999;font-weight:500}.empty{text-align:center;color:#bbb;padding:20px}
 {% for p in partners %}
 <div class="card"><h3>{{p.name}} ({{p.phone or '-'}}) · 佣金率:{{p.commission_rate}}% · 已赚:<span class="money">¥{{p.total_commission or 0}}</span>
 <a class="btn btn-del" href="/admin/partner/{{p.id}}/delete" onclick="return confirm('确定删除？')" style="font-size:11px;padding:3px 8px;margin-left:8px;color:#fff;text-decoration:none">删除</a></h3>
+<p style="font-size:12px;color:#666;margin-bottom:8px">🔗 推广链接: <code>https://jiaxiao.t-hub.cc/ref/{{p.code}}</code> <a href="javascript:void(0)" onclick="var t=document.createElement('textarea');t.value='https://jiaxiao.t-hub.cc/ref/{{p.code}}';document.body.appendChild(t);t.select();document.execCommand('copy');alert('已复制！');document.body.removeChild(t)" style="color:#1890ff;font-size:11px;margin-left:4px">复制</a></p>
 {% if p.clients %}<table><tr><th>客户</th><th>套餐</th><th>类型</th><th>佣金</th><th>时间</th></tr>
 {% for c in p.clients %}<tr><td>{{c.name}}</td><td>{{c.plan}}</td><td>{{c.year_type}}</td><td class="money">¥{{c.commission}}</td><td>{{c.created_at[:10]}}</td></tr>{% endfor %}</table>
 {% else %}<p class="empty">暂无客户</p>{% endif %}</div>
@@ -1051,13 +1052,30 @@ def partner_login():
         error = "手机号或密码错误"
     return render_template_string(PARTNER_LOGIN, error=error)
 
-@app.route("/ref/<code>")
+@app.route("/ref/<code>", methods=["GET","POST"])
 def partner_ref(code):
-    """推广链接落地页：记录cookie后跳转"""
-    d = db(); p = d.execute("SELECT * FROM referrers WHERE code=? AND role='agent' AND is_active=1",[code]).fetchone(); d.close()
-    if not p: return "推广链接无效", 404
-    resp = redirect("/admin")
-    resp.set_cookie("ref_code", code, max_age=86400*30)
+    """推广链接落地页"""
+    d = db(); p = d.execute("SELECT * FROM referrers WHERE code=? AND role='agent' AND is_active=1",[code]).fetchone()
+    if not p: d.close(); return "推广链接无效", 404
+    msg = ""
+    if request.method == "POST":
+        tid = f"t{datetime.now().strftime('%Y%m%d%H%M%S')}{uuid.uuid4().hex[:4]}"
+        d.execute("INSERT INTO tenants (id,name,contact_phone,industry_id,status,plan,referrer_id,trial_end) VALUES (?,?,?,?,?,?,?,?)",
+                  [tid, request.form["name"], request.form["phone"], "drv001", "trial", "trial", p["id"], (date.today()+timedelta(days=14)).isoformat()])
+        d.commit(); d.close()
+        msg = "提交成功！我们将在24小时内联系您，免费开通驾校小程序。"
+    d.close()
+    FORM = """<!DOCTYPE html><html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>微企通</title>
+<style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,sans-serif;background:linear-gradient(135deg,#1e3a5f,#2563eb);min-height:100vh;display:flex;align-items:center;justify-content:center}
+.card{background:#fff;border-radius:16px;padding:30px;width:90%;max-width:380px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.2)}
+h2{font-size:20px;margin-bottom:4px}.sub{color:#999;font-size:13px;margin-bottom:20px}
+input{width:100%;padding:10px;border:1px solid #d9d9d9;border-radius:6px;font-size:14px;margin-bottom:12px}
+.btn{width:100%;padding:10px;background:#2563eb;color:#fff;border:none;border-radius:6px;font-size:15px;cursor:pointer;font-weight:600}
+.msg{color:#52c41a;font-size:13px;margin-top:10px}</style></head><body>
+<div class="card"><h2>🚗 免费开通驾校小程序</h2><p class="sub">留下联系方式，我们帮您免费搭建</p>
+<form method="POST"><input name="name" placeholder="驾校名称" required><input name="phone" placeholder="联系电话" required><button class="btn" type="submit">提交申请</button></form>
+<p class="msg">MSG</p></div></body></html>"""
+    return FORM.replace("MSG", msg)
     return resp
 
 @app.route("/partner/dashboard")
