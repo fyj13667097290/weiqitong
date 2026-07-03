@@ -1343,6 +1343,9 @@ th{color:#999;font-weight:500}.empty{text-align:center;color:#bbb;padding:20px}
 <div class="card"><h3>👥 招生老师 <a href="/school/{{tenant.id}}/referrers">管理</a></h3>
 <p style="font-size:13px;color:#666">管理招生老师账号，查看各渠道推荐数据</p></div>
 
+{% if industry_slug in ('retail','restaurant','beauty') %}
+<div class="card"><h3>📂 商品类目 <a href="/school/{{tenant.id}}/categories">管理</a></h3><p style="font-size:13px;color:#666">自定义商品分类</p></div>
+{% endif %}
 <div class="card"><h3>📋 最近预约</h3>
 {% if appointments %}<table><tr><th>学员</th><th>电话</th><th>课程</th><th>时间</th><th>状态</th><th>操作</th></tr>
 {% for a in appointments %}<tr><td>{{a.student_name}}</td><td>{{a.student_phone}}</td><td>{{a.course_type}}</td><td>{{a.appointment_time}}</td><td><span class="tag tag-{{a.status}}">{{a.status}}</span></td>
@@ -1380,12 +1383,15 @@ def customer_dashboard(tid):
         return redirect(f"/school/{tid}/login")
     d = db()
     t = d.execute("SELECT * FROM tenants WHERE id=?", [tid]).fetchone()
+    industry = d.execute("SELECT slug FROM industries WHERE id=?",[t["industry_id"]]).fetchone()
+    industry_slug = industry["slug"] if industry else "driving"
     announcements = d.execute("SELECT * FROM announcements WHERE tenant_id=? ORDER BY is_pinned DESC, created_at DESC", [tid]).fetchall()
     courses = d.execute("SELECT * FROM dynamic_courses WHERE tenant_id=? ORDER BY sort_order", [tid]).fetchall()
     coaches = d.execute("SELECT * FROM dynamic_coaches WHERE tenant_id=? ORDER BY sort_order", [tid]).fetchall()
+    categories = d.execute("SELECT * FROM dynamic_categories WHERE tenant_id=? AND is_active=1 ORDER BY sort_order",[tid]).fetchall()
     appointments = d.execute("SELECT * FROM appointments WHERE tenant_id=? ORDER BY created_at DESC LIMIT 20", [tid]).fetchall()
     d.close()
-    return render_template_string(CUSTOMER_DASHBOARD, tenant=dict(t), announcements=announcements, courses=courses, coaches=coaches, appointments=appointments)
+    return render_template_string(CUSTOMER_DASHBOARD, tenant=dict(t), announcements=announcements, courses=courses, coaches=coaches, categories=categories, appointments=appointments, industry_slug=industry_slug)
 
 @app.route("/school/<tid>/announcement/new", methods=["GET","POST"])
 def customer_announcement_new(tid):
