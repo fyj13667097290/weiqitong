@@ -1063,7 +1063,7 @@ def partner_ref(code):
         d.execute("INSERT INTO tenants (id,name,contact_phone,industry_id,status,plan,referrer_id,trial_end) VALUES (?,?,?,?,?,?,?,?)",
                   [tid, request.form["name"], request.form["phone"], "drv001", "trial", "trial", p["id"], (date.today()+timedelta(days=14)).isoformat()])
         d.commit(); d.close()
-        msg = "提交成功！我们将在24小时内联系您，免费开通微信小程序。"
+        msg = "提交成功！14天免费试用已开通，我们将在24小时内联系您确认信息。"
     d.close()
     FORM = """<!DOCTYPE html><html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>微企通</title>
 <style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,sans-serif;background:linear-gradient(135deg,#1e3a5f,#2563eb);min-height:100vh;display:flex;align-items:center;justify-content:center}
@@ -1072,7 +1072,7 @@ h2{font-size:20px;margin-bottom:4px}.sub{color:#999;font-size:13px;margin-bottom
 input{width:100%;padding:10px;border:1px solid #d9d9d9;border-radius:6px;font-size:14px;margin-bottom:12px}
 .btn{width:100%;padding:10px;background:#2563eb;color:#fff;border:none;border-radius:6px;font-size:15px;cursor:pointer;font-weight:600}
 .msg{color:#52c41a;font-size:13px;margin-top:10px}</style></head><body>
-<div class="card"><h2>🏭 免费开通微信小程序</h2><p class="sub">留下联系方式，我们帮您免费搭建</p>
+<div class="card"><h2>🏭 免费试用微信小程序</h2><p class="sub">14天免费试用，满意再付费 · 留下联系方式立即开通</p>
 <form method="POST"><input name="name" placeholder="商家名称" required><input name="phone" placeholder="联系电话" required><button class="btn" type="submit">提交申请</button></form>
 <p class="msg">MSG</p></div></body></html>"""
     return FORM.replace("MSG", msg)
