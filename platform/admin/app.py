@@ -1296,6 +1296,33 @@ input{width:100%;padding:12px;border:1px solid #d9d9d9;border-radius:8px;font-si
 {% if error %}<p class="err">{{error}}</p>{% endif %}
 <button class="btn" type="submit">登录</button></form></div></body></html>"""
 
+RETAIL_DASHBOARD = """<!DOCTYPE html><html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{{tenant.name}} · 管理</title>
+<style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,sans-serif;background:#f0f2f5}
+.header{background:#1e293b;color:#fff;padding:12px 20px;display:flex;justify-content:space-between;align-items:center}
+.header h2{font-size:16px}.header a{color:#94a3b8;text-decoration:none;font-size:13px}
+.container{max-width:800px;margin:0 auto;padding:20px}
+.card{background:#fff;border-radius:8px;padding:20px;margin-bottom:16px;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+.card h3{font-size:16px;margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid #f0f0f0;display:flex;justify-content:space-between}
+.card h3 a{font-size:12px;color:#1890ff;text-decoration:none;font-weight:400}
+table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:8px 12px;text-align:left;border-bottom:1px solid #f0f0f0}
+th{color:#999;font-weight:500}.empty{text-align:center;color:#bbb;padding:20px}
+.btn-sm{font-size:11px;padding:3px 8px;border-radius:3px;border:none;cursor:pointer;text-decoration:none;color:#fff;display:inline-block}.btn-del{background:#ff4d4f}
+</style></head><body>
+<div class="header"><h2>\\U0001f3ed {{tenant.name}}</h2><div><a href="/school/{{tenant.id}}/password" style="color:#94a3b8;text-decoration:none;font-size:13px;margin-right:16px">修改密码</a><a href="/school/{{tenant.id}}/login">退出</a></div></div>
+<div class="container">
+
+<div class="card"><h3>\\U0001f4e2 公告 <a href="/school/{{tenant.id}}/announcement/new">+ 发布</a></h3>
+{% if announcements %}<table><tr><th>标题</th><th>时间</th><th>操作</th></tr>
+{% for a in announcements %}<tr><td>{{a.title}}</td><td>{{a.created_at[:10]}}</td><td><a class="btn-sm btn-del" href="/school/{{tenant.id}}/announcement/{{a.id}}/delete" onclick="return confirm('删除')">删除</a></td></tr>{% endfor %}</table>
+{% else %}<p class="empty">暂无公告</p>{% endif %}</div>
+
+<div class="card"><h3>\\U0001f4c2 商品类目 <a href="/school/{{tenant.id}}/categories">管理</a></h3>
+<p style="font-size:13px;color:#666">自定义商品分类，小程序商品页自动同步</p></div>
+
+<div class="card"><h3>\\U0001f4cb 最近订单</h3><p class="empty">暂无订单</p></div>
+
+</div></body></html>"""
+
 CUSTOMER_DASHBOARD = """<!DOCTYPE html><html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{{tenant.name}} · 管理</title>
 <style>:root{--primary:#667eea} *{margin:0;padding:0;box-sizing:border-box} body{font-family:-apple-system,sans-serif;background:#f0f2f5}
 .header{background:#1e293b;color:#fff;padding:12px 20px;display:flex;justify-content:space-between;align-items:center}
@@ -1389,7 +1416,9 @@ def customer_dashboard(tid):
     categories = d.execute("SELECT * FROM dynamic_categories WHERE tenant_id=? AND is_active=1 ORDER BY sort_order",[tid]).fetchall()
     appointments = d.execute("SELECT * FROM appointments WHERE tenant_id=? ORDER BY created_at DESC LIMIT 20", [tid]).fetchall()
     d.close()
-    return render_template_string(CUSTOMER_DASHBOARD, tenant=dict(t), announcements=announcements, courses=courses, coaches=coaches, categories=categories, appointments=appointments, industry_slug=industry_slug)
+    if industry_slug in ('retail','restaurant','beauty'):
+        return render_template_string(RETAIL_DASHBOARD, tenant=dict(t), announcements=announcements, categories=categories)
+    return render_template_string(CUSTOMER_DASHBOARD, tenant=dict(t), announcements=announcements, courses=courses, coaches=coaches, appointments=appointments, industry_slug='driving')
 
 @app.route("/school/<tid>/announcement/new", methods=["GET","POST"])
 def customer_announcement_new(tid):
