@@ -1334,6 +1334,9 @@ th{color:#999;font-weight:500}.empty{text-align:center;color:#bbb;padding:20px}
 {% for c in coaches %}<tr><td>{{c.name}}</td><td>{{c.experience}}年</td><td>{{c.rating or '-'}}</td><td><a class="btn-sm btn-del" href="/school/{{tenant.id}}/coach/{{c.id}}/delete" onclick="return confirm('确定删除？')">删除</a></td></tr>{% endfor %}</table>
 {% else %}<p class="empty">暂无教练</p>{% endif %}</div>
 
+<div class="card"><h3>📂 商品类目 <a href="/school/{{tenant.id}}/categories">管理</a></h3>
+<p style="font-size:13px;color:#666">自定义商品分类</p></div>
+
 <div class="card"><h3>⚙️ 预约设置 <a href="/school/{{tenant.id}}/appointment-settings">管理</a></h3>
 <p style="font-size:13px;color:#666">设可约时段、人数上限、开关预约</p></div>
 
@@ -1830,6 +1833,50 @@ def customer_appointment_complete(tid, aid):
     if (request.cookies.get("school_admin") != tid and request.cookies.get("admin_token") != get_admin_pw()): return redirect(f"/school/{tid}/login")
     d = db(); d.execute("UPDATE appointments SET status='completed' WHERE id=? AND tenant_id=?", [aid, tid]); d.commit(); d.close()
     return redirect(f"/school/{tid}/dashboard")
+
+# ==================== 类目管理 ====================
+
+@app.route("/school/<tid>/categories", methods=["GET","POST"])
+def customer_categories(tid):
+    if request.cookies.get("school_admin") != tid and request.cookies.get("admin_token") != get_admin_pw():
+        return redirect(f"/school/{tid}/login")
+    d = db()
+    t = d.execute("SELECT * FROM tenants WHERE id=?",[tid]).fetchone()
+    if request.method == "POST":
+        name = request.form.get("name","").strip()
+        if name:
+            d.execute("INSERT INTO dynamic_categories (tenant_id,name) VALUES (?,?)",[tid,name])
+            d.commit()
+        d.close(); return redirect(f"/school/{tid}/categories")
+    cats = d.execute("SELECT * FROM dynamic_categories WHERE tenant_id=? AND is_active=1 ORDER BY sort_order,id",[tid]).fetchall()
+    d.close()
+    rows = "".join([f"<tr><td>{c['name']}</td><td><a href='/school/{tid}/category/{c['id']}/delete' onclick=\"return confirm('确定删除？')\" style='color:#ff4d4f;font-size:12px'>删除</a></td></tr>" for c in cats])
+    return f"""<!DOCTYPE html><html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>类目管理</title>
+<style>*{{margin:0;padding:0}}body{{font-family:-apple-system,sans-serif;background:#f0f2f5;padding:20px}}
+.card{{background:#fff;max-width:500px;margin:20px auto;padding:24px;border-radius:12px;box-shadow:0 2rpx 12rpx rgba(0,0,0,.06)}}
+h3{{font-size:18px;margin-bottom:16px}}table{{width:100%;border-collapse:collapse;font-size:14px}}th,td{{padding:8px 12px;text-align:left;border-bottom:1px solid #f0f0f0}}th{{color:#999}}
+form{{display:flex;gap:10px;margin-top:12px}}input{{flex:1;padding:8px;border:1px solid #d9d9d9;border-radius:4px;font-size:14px}}
+.btn{{padding:8px 16px;background:#667eea;color:#fff;border:none;border-radius:4px;cursor:pointer}}a{{color:#999;text-decoration:none;font-size:13px}}
+</style></head><body><div class="card"><h3>📂 {t['name']} · 商品类目</h3>
+<table><tr><th>类目名称</th><th>操作</th></tr>{rows or '<tr><td colspan="2" style="color:#bbb;text-align:center">暂无类目</td></tr>'}</table>
+<form method="POST"><input name="name" placeholder="新类目名称" required><button class="btn" type="submit">添加</button></form>
+<p style="margin-top:16px"><a href="/school/{tid}/dashboard">← 返回</a></p>
+</div></body></html>"""
+
+@app.route("/school/<tid>/category/<int:cid>/delete")
+def customer_category_delete(tid, cid):
+    if request.cookies.get("school_admin") != tid and request.cookies.get("admin_token") != get_admin_pw():
+        return redirect(f"/school/{tid}/login")
+    d = db(); d.execute("UPDATE dynamic_categories SET is_active=0 WHERE id=? AND tenant_id=?",[cid,tid]); d.commit(); d.close()
+    return redirect(f"/school/{tid}/categories")
+
+@app.route("/api/public/<tid>/categories")
+def api_public_categories(tid):
+    d = db()
+    rows = d.execute("SELECT name FROM dynamic_categories WHERE tenant_id=? AND is_active=1 ORDER BY sort_order,id",[tid]).fetchall()
+    d.close()
+    cats = ["全部"] + [r["name"] for r in rows if r["name"]!="全部"]
+    return jsonify(cats)
 
 # ==================== 预约设置 ====================
 
