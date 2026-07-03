@@ -1212,6 +1212,9 @@ th{color:#999;font-weight:500}.empty{text-align:center;color:#bbb;padding:20px}
 <div class="header"><h2>🏫 {{tenant.name}}</h2><div><a href="/school/{{tenant.id}}/password" style="color:#94a3b8;text-decoration:none;font-size:13px;margin-right:16px">修改密码</a><a href="/school/{{tenant.id}}/login">退出</a></div></div>
 <div class="container">
 
+<div class="card"><h3>💳 升级套餐 <a href="/pay/{{tenant.id}}" target="_blank">立即付费</a></h3>
+<p style="font-size:13px;color:#666">当前: {{tenant.plan}} · 状态: {{tenant.status}}</p></div>
+
 <div class="card"><h3>🖼️ 小程序背景</h3>
 <form method="POST" action="/school/{{tenant.id}}/upload-bg" enctype="multipart/form-data" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
 <input type="file" name="bg_image" accept="image/*" required style="padding:6px;border:1px solid #d9d9d9;border-radius:4px;flex:1;min-width:200px">
