@@ -258,10 +258,10 @@ h2{margin-bottom:20px} .form-group{margin-bottom:16px} label{display:block;margi
 input,select,textarea{width:100%;padding:10px 12px;border:1px solid #d9d9d9;border-radius:4px;font-size:14px} input:focus,select:focus{border-color:var(--primary);outline:none;box-shadow:0 0 0 2px rgba(24,144,255,.2)}
 .btn{padding:10px 24px;border-radius:4px;border:none;font-size:14px;cursor:pointer;font-weight:500} .btn-primary{background:var(--primary);color:#fff;width:100%}
 .back{color:#999;text-decoration:none;font-size:13px;margin-bottom:16px;display:inline-block}</style></head><body>
-<div class="container"><a href="/admin" class="back">← 返回</a><div class="card"><h2>+ 添加驾校客户</h2>
-<form method="POST" action="/api/tenants"><div class="form-group"><label>驾校全称 *</label><input name="name" required placeholder="如：鑫达机动车驾驶培训学校"></div>
+<div class="container"><a href="/admin" class="back">← 返回</a><div class="card"><h2>+ 添加客户</h2>
+<form method="POST" action="/api/tenants"><div class="form-group"><label>商家全称 *</label><input name="name" required placeholder="如：鑫达机动车驾驶培训学校"></div>
 <div class="form-group"><label>简称</label><input name="short_name" placeholder="如：鑫达驾校" maxlength="10"></div>
-<div class="form-group"><label>联系人</label><input name="contact_name" placeholder="驾校老板姓名"></div>
+<div class="form-group"><label>联系人</label><input name="contact_name" placeholder="联系人姓名"></div>
 <div class="form-group"><label>联系电话</label><input name="contact_phone" placeholder="手机号"></div>
 <div class="form-group"><label>行业</label><select name="industry_id">{% for ind in industries %}<option value="{{ind.id}}" {% if preselected_industry==ind.id %}selected{% endif %}>{{ind.icon}} {{ind.name}}</option>{% endfor %}</select></div>
 <div class="form-group"><label>套餐</label><select name="plan"><option value="trial">试用版（免费14天）</option><option value="basic">基础版 999元/年</option><option value="standard">标准版 1999元/年</option><option value="pro">专业版 2999元/年</option></select></div>
