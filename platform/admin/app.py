@@ -661,9 +661,100 @@ function hardDelTenant(id,name){
 }
 </script></body></html>"""
 
+LANDING_V2 = """<!DOCTYPE html><html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>微企通 - 中小企业小程序解决方案</title>
+<style>:root{--primary:#2563eb}*{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,sans-serif;background:#f5f5f5}
+.hero{background:linear-gradient(135deg,#1e3a5f,#2563eb);color:#fff;padding:60px 20px;text-align:center}
+.hero h1{font-size:36px;font-weight:800;margin-bottom:8px}.hero p{font-size:16px;opacity:.85}
+.container{max-width:600px;margin:-30px auto 0;padding:0 20px}
+.card{background:#fff;border-radius:16px;padding:24px;margin-bottom:16px;box-shadow:0 2px 12px rgba(0,0,0,.06)}
+.card h3{font-size:18px;margin-bottom:16px;text-align:center}
+.industry-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:12px}
+.ind-card{text-align:center;padding:16px 8px;border:2px solid #eee;border-radius:12px;cursor:pointer;transition:all .2s}
+.ind-card:hover,.ind-card.active{border-color:var(--primary);background:#f0f5ff}
+.ind-icon{font-size:36px;display:block;margin-bottom:4px}.ind-name{font-size:14px;font-weight:600}
+.form-section{display:none}.form-section.show{display:block}
+input,select{width:100%;padding:12px;border:1px solid #d9d9d9;border-radius:8px;font-size:15px;margin-bottom:12px}
+.btn{width:100%;padding:14px;background:var(--primary);color:#fff;border:none;border-radius:8px;font-size:16px;cursor:pointer;font-weight:600}
+.msg{text-align:center;font-size:15px;padding:20px;color:#52c41a}.msg-err{color:#ff4d4f}
+.back{text-align:center;color:#999;font-size:13px;margin-top:12px;cursor:pointer}
+.footer{text-align:center;padding:30px 20px;color:#999;font-size:12px}
+</style></head><body>
+<div class="hero"><h1>🏭 微企通</h1><p>为中小企业提供微信小程序一站式解决方案</p></div>
+<div class="container" id="app">
+<div class="card" id="step-industry"><h3>选择你的行业</h3>
+<div class="industry-grid" id="industry-list"></div>
+</div>
+<div class="card form-section" id="step-form"><h3 id="form-title">填写信息</h3>
+<form id="signup-form"><input type="hidden" id="industry-slug" name="industry_id">
+<input name="name" placeholder="商家名称" required>
+<input name="phone" placeholder="联系电话" required>
+<button class="btn" type="submit">提交申请 · 免费试用14天</button></form>
+<div class="back" onclick="backToIndustry()">← 重新选择行业</div>
+</div>
+<div class="card form-section" id="step-done"><div class="msg"></div></div>
+</div>
+<div class="footer">14天免费试用 · 满意再付费 · 从 ¥999/年 起</div>
+<script>
+var industries=INDPLACEHOLDER;
+var list=document.getElementById('industry-list');
+industries.forEach(function(ind){
+  var d=document.createElement('div');d.className='ind-card';
+  d.innerHTML='<span class="ind-icon">'+ind.icon+'</span><span class="ind-name">'+ind.name+'</span>';
+  d.onclick=function(){selectIndustry(ind.id,ind.name,ind.icon)};
+  list.appendChild(d);
+});
+function selectIndustry(id,name,icon){
+  document.getElementById('industry-slug').value=id;
+  document.getElementById('form-title').innerHTML=icon+' '+name+' · 填写信息';
+  document.getElementById('step-industry').style.display='none';
+  document.getElementById('step-form').classList.add('show');
+}
+function backToIndustry(){
+  document.getElementById('step-industry').style.display='block';
+  document.getElementById('step-form').classList.remove('show');
+}
+document.getElementById('signup-form').onsubmit=function(e){
+  e.preventDefault();
+  var f=e.target,data=new FormData(f);
+  fetch('/api/signup',{method:'POST',body:new URLSearchParams(data)}).then(function(r){return r.json()}).then(function(d){
+    document.getElementById('step-form').classList.remove('show');
+    document.getElementById('step-done').classList.add('show');
+    var msg=document.querySelector('#step-done .msg');
+    if(d.ok){msg.textContent='✅ 提交成功！我们将在24小时内联系您开通试用。';msg.className='msg'}
+    else{msg.textContent='❌ '+(d.error||'提交失败');msg.className='msg msg-err'}
+  });
+  return false;
+};
+</script></body></html>"""
+
 @app.route("/")
 def landing():
-    return LANDING_PAGE
+    d = db()
+    industries = d.execute("SELECT id,name,slug,icon FROM industries WHERE is_active=1 ORDER BY sort_order").fetchall()
+    d.close()
+    ind_json = json.dumps([{"id":r["id"],"name":r["name"],"icon":r["icon"]} for r in industries], ensure_ascii=False)
+    return LANDING_V2.replace("INDPLACEHOLDER", ind_json)
+
+@app.route("/api/signup", methods=["POST"])
+def api_signup():
+    """首页注册：自动创建试用客户并关联推广人"""
+    industry_id = request.form.get("industry_id","drv001")
+    name = request.form.get("name","")
+    phone = request.form.get("phone","")
+    if not name or not phone:
+        return jsonify({"ok":False,"error":"请填写商家名称和联系电话"})
+    d = db()
+    tid = f"t{datetime.now().strftime('%Y%m%d%H%M%S')}{uuid.uuid4().hex[:4]}"
+    # 读推广人cookie
+    ref_code = request.cookies.get("ref_code","")
+    ref_id = None
+    if ref_code:
+        ref = d.execute("SELECT id FROM referrers WHERE code=? AND role='agent' AND is_active=1",[ref_code]).fetchone()
+        if ref: ref_id = ref["id"]
+    d.execute("INSERT INTO tenants (id,name,contact_phone,industry_id,status,plan,referrer_id,trial_end) VALUES (?,?,?,?,?,?,?,?)",
+              [tid, name, phone, industry_id, "trial", "trial", ref_id, (date.today()+timedelta(days=14)).isoformat()])
+    d.commit(); d.close()
+    return jsonify({"ok":True,"tenant_id":tid})
 
 ADMIN_LOGIN_HTML = """<!DOCTYPE html><html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>微企通 · 管理员登录</title>
 <style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,sans-serif;background:linear-gradient(135deg,#1e3a5f,#2563eb);min-height:100vh;display:flex;align-items:center;justify-content:center}
@@ -1122,31 +1213,15 @@ def partner_login():
         error = "手机号或密码错误"
     return render_template_string(PARTNER_LOGIN, error=error)
 
-@app.route("/ref/<code>", methods=["GET","POST"])
+@app.route("/ref/<code>")
 def partner_ref(code):
-    """推广链接落地页"""
-    d = db(); p = d.execute("SELECT * FROM referrers WHERE code=? AND role='agent' AND is_active=1",[code]).fetchone()
-    if not p: d.close(); return "推广链接无效", 404
-    msg = ""
-    if request.method == "POST":
-        tid = f"t{datetime.now().strftime('%Y%m%d%H%M%S')}{uuid.uuid4().hex[:4]}"
-        d.execute("INSERT INTO tenants (id,name,contact_phone,industry_id,status,plan,referrer_id,trial_end) VALUES (?,?,?,?,?,?,?,?)",
-                  [tid, request.form["name"], request.form["phone"], "drv001", "trial", "trial", p["id"], (date.today()+timedelta(days=14)).isoformat()])
-        d.commit(); d.close()
-        msg = "提交成功！14天免费试用已开通，我们将在24小时内联系您确认信息。"
-    d.close()
-    FORM = """<!DOCTYPE html><html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>微企通</title>
-<style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,sans-serif;background:linear-gradient(135deg,#1e3a5f,#2563eb);min-height:100vh;display:flex;align-items:center;justify-content:center}
-.card{background:#fff;border-radius:16px;padding:30px;width:90%;max-width:380px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.2)}
-h2{font-size:20px;margin-bottom:4px}.sub{color:#999;font-size:13px;margin-bottom:20px}
-input{width:100%;padding:10px;border:1px solid #d9d9d9;border-radius:6px;font-size:14px;margin-bottom:12px}
-.btn{width:100%;padding:10px;background:#2563eb;color:#fff;border:none;border-radius:6px;font-size:15px;cursor:pointer;font-weight:600}
-.msg{color:#52c41a;font-size:13px;margin-top:10px}</style></head><body>
-<div class="card"><h2>🏭 免费试用微信小程序</h2><p class="sub">14天免费试用，满意再付费 · 留下联系方式立即开通</p>
-<form method="POST"><input name="name" placeholder="商家名称" required><input name="phone" placeholder="联系电话" required><button class="btn" type="submit">提交申请</button></form>
-<p class="msg">MSG</p></div></body></html>"""
-    return FORM.replace("MSG", msg)
+    """推广链接：记录推广人cookie后跳转首页统一注册"""
+    d = db(); p = d.execute("SELECT * FROM referrers WHERE code=? AND role='agent' AND is_active=1",[code]).fetchone(); d.close()
+    if not p: return "推广链接无效", 404
+    resp = redirect("/")
+    resp.set_cookie("ref_code", code, max_age=86400*30)
     return resp
+
 
 @app.route("/partner/dashboard")
 def partner_dashboard():
