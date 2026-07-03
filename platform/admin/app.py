@@ -1310,6 +1310,7 @@ th{color:#999;font-weight:500}.empty{text-align:center;color:#bbb;padding:20px}
 <div class="header"><h2>🏫 {{tenant.name}}</h2><div><a href="/school/{{tenant.id}}/password" style="color:#94a3b8;text-decoration:none;font-size:13px;margin-right:16px">修改密码</a><a href="/school/{{tenant.id}}/login">退出</a></div></div>
 <div class="container">
 
+{% if industry_slug=='driving' %}
 <div class="card"><h3>💳 升级套餐 <a href="/pay/{{tenant.id}}" target="_blank">立即付费</a></h3>
 <p style="font-size:13px;color:#666">当前: {{tenant.plan}} · 状态: {{tenant.status}}</p></div>
 
@@ -1344,6 +1345,10 @@ th{color:#999;font-weight:500}.empty{text-align:center;color:#bbb;padding:20px}
 <p style="font-size:13px;color:#666">管理招生老师账号，查看各渠道推荐数据</p></div>
 
 {% if industry_slug in ('retail','restaurant','beauty') %}
+<div class="card"><h3>📂 商品类目 <a href="/school/{{tenant.id}}/categories">管理</a></h3><p style="font-size:13px;color:#666">自定义商品分类</p></div>
+{% endif %}
+
+{% elif industry_slug in ('retail','restaurant','beauty') %}
 <div class="card"><h3>📂 商品类目 <a href="/school/{{tenant.id}}/categories">管理</a></h3><p style="font-size:13px;color:#666">自定义商品分类</p></div>
 {% endif %}
 <div class="card"><h3>📋 最近预约</h3>
