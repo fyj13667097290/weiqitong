@@ -268,6 +268,127 @@ input,select,textarea{width:100%;padding:10px 12px;border:1px solid #d9d9d9;bord
 <div class="form-group"><label>推广人</label><select name="referrer_id"><option value="">无</option>{% for r in referrers %}<option value="{{r.id}}" {% if preselected_ref==r.id %}selected{% endif %}>{{r.name}} ({{r.phone or ''}})</option>{% endfor %}</select></div>
 <button type="submit" class="btn btn-primary">创建客户</button></form></div></div></body></html>"""
 
+RETAIL_CONFIG = """<!DOCTYPE html><html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>零售配置</title>
+<style>:root{--primary:#1890ff;--danger:#ff4d4f;--bg:#f0f2f5}*{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,sans-serif;background:var(--bg)}
+.container{max-width:800px;margin:20px auto;padding:20px}.card{background:#fff;border-radius:8px;padding:24px;margin-bottom:20px;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+h2{font-size:18px;margin-bottom:16px;padding-bottom:10px;border-bottom:1px solid #f0f0f0}
+h3{font-size:15px;color:#555;margin:20px 0 12px;padding-left:8px;border-left:3px solid var(--primary)}
+.form-group{margin-bottom:14px}label{display:block;margin-bottom:5px;font-weight:500;font-size:13px;color:#555}
+input,select,textarea{width:100%;padding:9px 12px;border:1px solid #d9d9d9;border-radius:4px;font-size:14px;font-family:inherit}
+input:focus,select:focus,textarea:focus{border-color:var(--primary);outline:none;box-shadow:0 0 0 2px rgba(24,144,255,.2)}
+textarea{resize:vertical;min-height:80px}
+.btn{padding:10px 20px;border-radius:4px;border:none;font-size:14px;cursor:pointer;font-weight:500}.btn-primary{background:var(--primary);color:#fff}.btn-success{background:#52c41a;color:#fff}.btn-warn{background:#fa8c16;color:#fff}.btn-sm{padding:4px 10px;font-size:12px}.btn-danger{background:var(--danger);color:#fff}
+.btn-group{display:flex;gap:10px;margin-top:20px;flex-wrap:wrap}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.back{color:#999;text-decoration:none;font-size:13px;display:inline-block;margin-bottom:16px}
+.tab-bar{display:flex;border-bottom:2px solid #f0f0f0;margin-bottom:20px}
+.tab-item{padding:10px 20px;color:#999;cursor:pointer;font-size:14px;border-bottom:2px solid transparent;margin-bottom:-2px;user-select:none}
+.tab-item.active{color:var(--primary);border-bottom-color:var(--primary);font-weight:500}
+.tab-content{display:none}.tab-content.active{display:block}
+.item-row{display:grid;grid-template-columns:1fr 100px 80px 60px;gap:10px;align-items:start;margin-bottom:8px;padding:10px;background:#fafafa;border-radius:6px}
+.log-box{background:#1e293b;color:#4ade80;padding:16px;border-radius:8px;font-size:13px;max-height:300px;overflow-y:auto;white-space:pre-wrap;font-family:monospace}
+.empty{text-align:center;color:#bbb;padding:20px}</style></head><body>
+<div class="container">
+<a href="/admin" class="back">← 返回管理后台</a>
+<div class="tab-bar">
+  <div class="tab-item active" onclick="switchTab('tab-basic',this)">基本信息</div>
+  <div class="tab-item" onclick="switchTab('tab-products',this)">商品管理</div>
+  <div class="tab-item" onclick="switchTab('tab-deploy',this)">部署上线</div>
+</div>
+
+<form id="configForm">
+<div class="tab-content active" id="tab-basic">
+  <div class="card"><h3>店铺信息</h3>
+    <div class="row"><div class="form-group"><label>店铺名称 *</label><input id="f_shop_name" required></div>
+    <div class="form-group"><label>简称</label><input id="f_shop_shortName"></div></div>
+    <div class="row"><div class="form-group"><label>联系电话 *</label><input id="f_shop_phone" required></div>
+    <div class="form-group"><label>Logo URL</label><input id="f_shop_logo" placeholder="https://..."></div></div>
+    <div class="form-group"><label>地址</label><input id="f_shop_address"></div>
+    <div class="form-group"><label>店铺简介</label><textarea id="f_shop_description" maxlength="500"></textarea></div>
+    <div class="row"><div class="form-group"><label>主题色</label><input type="color" id="f_primaryColor" value="#ff6b35" style="width:60px;height:40px;padding:2px"></div>
+    <div class="form-group"><label>小程序 AppID</label><input id="f_mini_appid" placeholder="wx开头（部署时必填）"></div></div>
+  </div>
+</div>
+
+<div class="tab-content" id="tab-products">
+  <div class="card"><h3>商品列表</h3><div id="products-list"></div>
+    <p class="empty" id="products-empty" style="display:none">暂无商品，点击下方添加</p>
+    <button type="button" class="btn btn-primary btn-sm" onclick="addProduct()" style="margin-top:12px">+ 添加商品</button>
+  </div>
+</div>
+
+<div class="tab-content" id="tab-deploy">
+  <div class="card"><h3>部署状态</h3><div id="deploy-status">加载中...</div></div>
+  <div class="card"><h3>部署日志</h3><div class="log-box" id="deploy-log">等待部署...</div></div>
+</div>
+</form>
+
+<div class="btn-group">
+  <button type="button" class="btn btn-primary" onclick="saveR()">💾 保存配置</button>
+  <button type="button" class="btn btn-success" onclick="generateR()">⚙️ 生成代码</button>
+  <button type="button" class="btn btn-warn" onclick="deployR()">🚀 部署到微信</button>
+  <button type="button" class="btn" onclick="submitAR()" style="background:#722ed1;color:#fff">📝 提交审核</button>
+  <button type="button" class="btn" onclick="releaseR()" style="background:#13c2c2;color:#fff">🎉 发布上线</button>
+</div>
+</div>
+
+<script>
+var tid=window.location.pathname.split('/')[2];
+var cfg={shop:{name:'',shortName:'',logo:'',phone:'',address:'',description:'',theme:{primaryColor:'#ff6b35'}},products:[],categories:['全部'],features:{cart:true,orderTracking:true}};
+var dlog=document.getElementById('deploy-log');
+function L(m){dlog.textContent='['+new Date().toLocaleTimeString()+'] '+m+'\\n'+dlog.textContent}
+
+function loadR(){
+  fetch('/api/tenants/'+tid+'/config').then(function(r){return r.json()}).then(function(d){
+    if(d.config&&d.config.shop)cfg=d.config;
+    renderR();
+  });
+}
+function renderR(){
+  var s=cfg.shop||{};
+  document.getElementById('f_shop_name').value=s.name||'';
+  document.getElementById('f_shop_shortName').value=s.shortName||'';
+  document.getElementById('f_shop_phone').value=s.phone||'';
+  document.getElementById('f_shop_logo').value=s.logo||'';
+  document.getElementById('f_shop_address').value=s.address||'';
+  document.getElementById('f_shop_description').value=s.description||'';
+  document.getElementById('f_primaryColor').value=(s.theme&&s.theme.primaryColor)||'#ff6b35';
+  var pl=document.getElementById('products-list');
+  pl.innerHTML=(cfg.products||[]).map(function(p,i){
+    return '<div class="item-row"><input value="'+esc(p.name||'')+'" onchange="cfg.products['+i+'].name=this.value" placeholder="商品名"><input type="number" value="'+(p.price||'')+'" onchange="cfg.products['+i+'].price=Number(this.value)" placeholder="价格"><input value="'+(p.category||'')+'" onchange="cfg.products['+i+'].category=this.value" placeholder="分类"><button type="button" class="btn btn-danger btn-sm" onclick="cfg.products.splice('+i+',1);renderR()">删除</button></div>';
+  }).join('');
+  document.getElementById('products-empty').style.display=(cfg.products||[]).length?'none':'';
+}
+function esc(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
+function addProduct(){cfg.products.push({name:'',price:0,category:''});renderR()}
+function collectR(){
+  cfg.shop.name=document.getElementById('f_shop_name').value;
+  cfg.shop.shortName=document.getElementById('f_shop_shortName').value;
+  cfg.shop.phone=document.getElementById('f_shop_phone').value;
+  cfg.shop.logo=document.getElementById('f_shop_logo').value;
+  cfg.shop.address=document.getElementById('f_shop_address').value;
+  cfg.shop.description=document.getElementById('f_shop_description').value;
+  cfg.shop.theme={primaryColor:document.getElementById('f_primaryColor').value};
+  return cfg;
+}
+function switchTab(id,el){
+  document.querySelectorAll('.tab-item,.tab-content').forEach(function(e){e.classList.remove('active')});
+  el.classList.add('active');var t=document.getElementById(id);if(t){t.classList.add('active');if(id==='tab-deploy')loadDeploymentsR()}
+}
+async function saveR(){var c=collectR();await fetch('/api/tenants/'+tid+'/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({config:c,mini_appid:document.getElementById('f_mini_appid').value})});L('配置已保存')}
+async function generateR(){await saveR();L('正在生成代码...');await fetch('/api/tenants/'+tid+'/deploy',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'generate'})});L('代码已生成');setTimeout(loadDeploymentsR,2000)}
+async function deployR(){await saveR();L('正在部署...');await fetch('/api/tenants/'+tid+'/deploy',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'upload'})});L('已部署');setTimeout(loadDeploymentsR,3000)}
+async function submitAR(){await saveR();var r=await fetch('/api/wechat/submit-audit/'+tid,{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});var d=await r.json();L(d.error||d.message||'审核已提交');loadDeploymentsR()}
+async function releaseR(){var r=await fetch('/api/wechat/release/'+tid,{method:'POST'});var d=await r.json();L(d.error||d.message||'已发布');loadDeploymentsR()}
+async function loadDeploymentsR(){
+  var r=await fetch('/api/tenants/'+tid+'/deployments');var list=await r.json();
+  document.getElementById('deploy-status').innerHTML=list.length?'<p>最近部署：<strong>'+list[0].action+'</strong> <span style="color:'+(list[0].result==='success'?'#52c41a':'#fa8c16')+'">'+list[0].result+'</span> ('+list[0].created_at+')</p>':'<p style="color:#999">还没有部署记录</p>';
+  var lines=[];for(var i=0;i<list.length;i++){var d=list[i];lines.push('['+d.created_at+'] '+d.action+': '+d.result+' - '+(d.message||''))}
+  dlog.textContent=lines.join('\\n')||'暂无日志';
+}
+loadR();
+</script></body></html>"""
+
 HTML_CONFIG = """<!DOCTYPE html><html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>驾校配置</title>
 <style>:root{--primary:#1890ff;--danger:#ff4d4f;--bg:#f0f2f5} *{margin:0;padding:0;box-sizing:border-box} body{font-family:-apple-system,sans-serif;background:var(--bg)}
 .container{max-width:800px;margin:20px auto;padding:20px} .card{background:#fff;border-radius:8px;padding:24px;margin-bottom:20px;box-shadow:0 1px 3px rgba(0,0,0,.08)}
@@ -838,8 +959,13 @@ def new_tenant():
 def config_page(tid):
     d = db()
     t = d.execute("SELECT * FROM tenants WHERE id=?", [tid]).fetchone()
+    if not t: d.close(); return ("Not found", 404)
+    industry = d.execute("SELECT slug FROM industries WHERE id=?",[t["industry_id"]]).fetchone()
     d.close()
-    return render_template_string(HTML_CONFIG, tenant=row2dict(t)) if t else ("Not found", 404)
+    slug = industry["slug"] if industry else "driving"
+    if slug in ('retail','restaurant','beauty'):
+        return render_template_string(RETAIL_CONFIG, tenant=row2dict(t))
+    return render_template_string(HTML_CONFIG, tenant=row2dict(t))
 
 # ==================== API: 租户 ====================
 
