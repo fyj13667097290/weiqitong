@@ -973,8 +973,8 @@ PAY_PAGE = """<!DOCTYPE html><html lang="zh"><head><meta charset="utf-8"><meta n
 <div class="card">
 <h3 style="margin-bottom:16px;font-size:16px">📱 扫码支付</h3>
 <div class="qr-section">
-<div class="qr-card"><div style="width:160px;height:160px;background:#fff;margin:0 auto;display:flex;align-items:center;justify-content:center;border:2px dashed #07c160;border-radius:4px;font-size:13px;color:#07c160">微信<br>收款码</div><div class="qr-label">微信支付</div><div class="qr-tip">扫码支付 ¥{{price}}</div></div>
-<div class="qr-card"><div style="width:160px;height:160px;background:#fff;margin:0 auto;display:flex;align-items:center;justify-content:center;border:2px dashed #1677ff;border-radius:4px;font-size:13px;color:#1677ff">支付宝<br>收款码</div><div class="qr-label">支付宝</div><div class="qr-tip">扫码支付 ¥{{price}}</div></div>
+<div class="qr-card"><img src="https://jiaxiao.t-hub.cc/uploads/wechat_qr.png" alt="微信收款码"><div class="qr-label">微信支付</div><div class="qr-tip">扫码支付 ¥{{price}}</div></div>
+<div class="qr-card"><img src="https://jiaxiao.t-hub.cc/uploads/alipay_qr.png" alt="支付宝收款码"><div class="qr-label">支付宝</div><div class="qr-tip">扫码支付 ¥{{price}}</div></div>
 </div>
 <p class="note">⚠️ 付完请截图发给对接人员确认开通</p>
 </div>
