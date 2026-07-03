@@ -600,6 +600,8 @@ th{color:#999;font-weight:500;font-size:13px;background:#fafafa}
   <a href="/school/{{t.id}}/impersonate" class="btn btn-sm" style="background:#fa8c16;color:#fff;font-size:11px;padding:3px 8px;text-decoration:none;border-radius:3px">③ 管理</a>
   <a href="/school/{{t.id}}/login" target="_blank" class="btn btn-sm" style="background:#52c41a;color:#fff;font-size:11px;padding:3px 8px;text-decoration:none;border-radius:3px">③ 自助后台</a>
   <a href="#" onclick="copyLink('{{t.id}}')" class="btn btn-sm" style="background:#1890ff;color:#fff;font-size:11px;padding:3px 8px;text-decoration:none;border-radius:3px">🔗</a>
+  <a href="/pay/{{t.id}}" target="_blank" class="btn btn-sm" style="background:#ff9800;color:#fff;font-size:11px;padding:3px 8px;text-decoration:none;border-radius:3px">付费</a>
+  <a href="/admin/tenant/{{t.id}}/mark-paid" class="btn btn-sm" style="background:#4caf50;color:#fff;font-size:11px;padding:3px 8px;text-decoration:none;border-radius:3px">已收款</a>
   <a href="#" onclick="delTenant('{{t.id}}','{{t.name}}')" class="btn btn-sm" style="background:#ff4d4f;color:#fff;font-size:11px;padding:3px 8px;text-decoration:none;border-radius:3px">删除</a>
 {% endif %}</td>
 </tr>{% endfor %}{% else %}<tr><td colspan="7" class="empty">{% if filter_status=='deleted' %}没有已删除的客户{% else %}还没有客户{% endif %}</td></tr>{% endif %}</tbody></table>
