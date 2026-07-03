@@ -17,7 +17,7 @@
   </view>
 </template>
 <script>
-import config from '../../retail.config.json';
+import config from '../../school.config.json';
 export default {
   data(){ return { theme:config.shop.theme, cartItems:[] }; },
   computed: { totalPrice(){ return this.cartItems.reduce(function(s,c){return s+c.price*(c.qty||1)},0); } },

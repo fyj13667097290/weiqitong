@@ -10,7 +10,7 @@
   </view>
 </template>
 <script>
-import config from '../../retail.config.json';
+import config from '../../school.config.json';
 export default {
   data(){ return { shop:config.shop, theme:config.shop.theme }; },
   methods: { callShop(){ uni.makePhoneCall({phoneNumber:this.shop.phone}); } }

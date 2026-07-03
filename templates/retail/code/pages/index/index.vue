@@ -36,7 +36,7 @@
   </view>
 </template>
 <script>
-import config from '../../retail.config.json';
+import config from '../../school.config.json';
 var TID=(config._meta&&config._meta.tenantId)||'',API=(config._meta&&config._meta.apiBase)||'';
 function getList(p){ return new Promise(function(resolve){ uni.request({url:API+'/api/public/'+TID+'/'+p,success:function(r){resolve(r.data)},fail:function(){resolve([])}}); }); }
 export default {

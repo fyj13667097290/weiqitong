@@ -16,7 +16,7 @@
   </view>
 </template>
 <script>
-import config from '../../retail.config.json';
+import config from '../../school.config.json';
 export default {
   data(){ return { products:config.products||[], categories:config.categories||['全部'], selCat:'全部', theme:config.shop.theme, cart:[] }; },
   computed: { filteredProducts(){ var s=this; if(s.selCat==='全部')return s.products; return s.products.filter(function(p){return p.category===s.selCat}); } },
