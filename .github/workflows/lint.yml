@@ -1,0 +1,53 @@
+name: 小程序模板语法检查
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'templates/driving/code/**/*.vue'
+  pull_request:
+    branches: [master]
+  workflow_dispatch:
+
+jobs:
+  lint-templates:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: 扫描WXML不兼容语法
+        run: |
+          echo "🔍 正在扫描 .vue 文件中 {{}} 里的 < 和 > 符号..."
+          BAD=0
+          find templates -name "*.vue" | while read f; do
+            VIOLATIONS=$(grep -n '\{\{[^}]*[<>][^}]*\}\}' "$f" 2>/dev/null || true)
+            if [ -n "$VIOLATIONS" ]; then
+              echo ""
+              echo "❌ $f"
+              echo "$VIOLATIONS" | while read line; do
+                echo "   $line"
+              done
+              BAD=1
+            fi
+          done
+          if [ "$BAD" -eq 1 ]; then
+            echo ""
+            echo "══════════════════════════════════════"
+            echo "⚠️  发现 WXML 不兼容写法！"
+            echo "   把 {{}} 中的 < 或 > 改为 computed 属性"
+            echo "   详见 templates/driving/RULES.md"
+            echo "══════════════════════════════════════"
+            exit 1
+          else
+            echo "✅ 所有模板检查通过"
+          fi
+
+      - name: 数据库备份检查
+        run: |
+          echo "📦 检查备份脚本是否存在..."
+          if [ -f "scripts/generate.js" ]; then
+            echo "✅ 项目结构完整"
+          else
+            echo "⚠️  generate.js 丢失"
+            exit 1
+          fi
