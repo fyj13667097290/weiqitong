@@ -1812,21 +1812,33 @@ def wechat_fast_register(tid):
     if not token: d.close(); return jsonify({"error":"微信服务暂不可用"}), 500
 
     data = request.get_json()
+    req_data = {
+        "name": data.get("mp_name", t["name"]),
+        "code": data.get("license_code", ""),
+        "code_type": 1,
+        "legal_persona_wechat": data.get("legal_wechat", ""),
+        "legal_persona_name": data.get("legal_name", ""),
+        "component_phone": data.get("phone", t["contact_phone"] or "")
+    }
     resp = _requests.post(
         f"https://api.weixin.qq.com/cgi-bin/component/fastregisterweapp?action=create&component_access_token={token}",
-        json={
-            "name": data.get("mp_name", t["name"]),
-            "code": data.get("license_code", ""),
-            "code_type": 1,
-            "legal_persona_wechat": data.get("legal_wechat", ""),
-            "legal_persona_name": data.get("legal_name", ""),
-            "component_phone": data.get("phone", t["contact_phone"] or "")
-        }
+        json=req_data, timeout=15
     ).json()
 
-    if resp.get("errcode", 0) != 0:
-        err = resp.get("errmsg", "注册失败")
-        d.close(); return jsonify({"error": err})
+    errcode = resp.get("errcode", 0)
+    if errcode != 0:
+        # 微信已知bug：返回-1但可能创建成功，尝试查询确认
+        if errcode == -1:
+            check = _requests.post(f"https://api.weixin.qq.com/cgi-bin/component/fastregisterweapp?action=search&component_access_token={token}", json={
+                "name": data.get("mp_name", t["name"]),
+                "legal_persona_wechat": data.get("legal_wechat", ""),
+                "legal_persona_name": data.get("legal_name", "")
+            }).json()
+            if check.get("errcode", -1) == 0:
+                errcode = 0  # 实际上是成功了
+        if errcode != 0:
+            err = f"{resp.get('errmsg','注册失败')} (rid: {resp.get('rid','')})"
+            d.close(); return jsonify({"error": err, "tip":"如果mp.weixin.qq.com已出现新小程序，说明已创建成功，可直接用其AppID"})
 
     # 保存法人信息
     d.execute("UPDATE tenants SET contact_name=?, contact_phone=? WHERE id=?",
