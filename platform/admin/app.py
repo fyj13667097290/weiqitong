@@ -172,11 +172,14 @@ def wechat_callback():
                 d2.close()
         elif info_type == "weapp_audit_success":
             appid = xml.findtext("ToAppid")
-            app.logger.info(f"WX_AUDIT_SUCCESS: {appid}")
+            d2 = db(); tid_row = d2.execute("SELECT tenant_id FROM wechat_auths WHERE authorizer_appid=?",[appid]).fetchone()
+            if tid_row: d2.execute("INSERT INTO deployments (tenant_id,config_version,action,result,message) VALUES (?,?,?,?,?)",[tid_row["tenant_id"],0,"audit","success","审核通过，可以发布"])
+            d2.commit(); d2.close()
         elif info_type == "weapp_audit_fail":
-            appid = xml.findtext("ToAppid")
-            reason = xml.findtext("Reason") or "未知原因"
-            app.logger.info(f"WX_AUDIT_FAIL: {appid} - {reason}")
+            appid = xml.findtext("ToAppid"); reason = xml.findtext("Reason") or "未知原因"
+            d2 = db(); tid_row = d2.execute("SELECT tenant_id FROM wechat_auths WHERE authorizer_appid=?",[appid]).fetchone()
+            if tid_row: d2.execute("INSERT INTO deployments (tenant_id,config_version,action,result,message) VALUES (?,?,?,?,?)",[tid_row["tenant_id"],0,"audit","failed","拒审: "+reason])
+            d2.commit(); d2.close()
     except Exception as e:
         app.logger.error(f"WX_CALLBACK_ERROR: {e}")
     return "success"
@@ -924,7 +927,7 @@ def index():
     }
     industry = request.args.get("industry", "")
     filter_status = request.args.get("status", "active")  # active / all / deleted
-    base_sql = "SELECT t.*, i.name as industry_name, r.name as referrer_name, (SELECT d2.result FROM deployments d2 WHERE d2.tenant_id=t.id ORDER BY d2.created_at DESC LIMIT 1) as deploy_status FROM tenants t LEFT JOIN industries i ON t.industry_id=i.id LEFT JOIN referrers r ON t.referrer_id=r.id"
+    base_sql = "SELECT t.*, i.name as industry_name, r.name as referrer_name, (SELECT d2.action||':'||d2.result FROM deployments d2 WHERE d2.tenant_id=t.id ORDER BY d2.created_at DESC LIMIT 1) as deploy_status FROM tenants t LEFT JOIN industries i ON t.industry_id=i.id LEFT JOIN referrers r ON t.referrer_id=r.id"
     conditions = []
     params = []
     if industry: conditions.append("t.industry_id=?"); params.append(industry)
