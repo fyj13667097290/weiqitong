@@ -356,6 +356,10 @@ function renderR(){
   document.getElementById('f_shop_address').value=s.address||'';
   document.getElementById('f_shop_description').value=s.description||'';
   document.getElementById('f_primaryColor').value=(s.theme&&s.theme.primaryColor)||'#ff6b35';
+  // 回填AppID
+  fetch('/api/tenants/'+tid+'/config').then(function(r){return r.json()}).then(function(d){
+    if(d.mini_appid) document.getElementById('f_mini_appid').value=d.mini_appid;
+  });
   var pl=document.getElementById('products-list');
   pl.innerHTML=(cfg.products||[]).map(function(p,i){
     return '<div class="item-row"><input value="'+esc(p.name||'')+'" onchange="cfg.products['+i+'].name=this.value" placeholder="商品名"><input type="number" value="'+(p.price||'')+'" onchange="cfg.products['+i+'].price=Number(this.value)" placeholder="价格"><input value="'+(p.category||'')+'" onchange="cfg.products['+i+'].category=this.value" placeholder="分类"><button type="button" class="btn btn-danger btn-sm" onclick="cfg.products.splice('+i+',1);renderR()">删除</button></div>';
@@ -1039,16 +1043,26 @@ def api_get_config(tid):
         r["config"] = json.loads(r["config"])
         d.close()
         return jsonify(r)
-    default = {
-        "school": {"name":"","shortName":"","logo":"","phone":"","address":"","description":"","photos":[],"theme":{"primaryColor":"#1890ff"}},
-        "courses": [], "coaches": [], "locations": [], "features": {"appointment":True,"examPrep":True,"onlinePayment":False}
-    }
-    # 没有配置时，从租户信息预填充
     tenant = d.execute("SELECT * FROM tenants WHERE id=?", [tid]).fetchone()
+    # 根据行业返回不同默认配置
+    industry = d.execute("SELECT slug FROM industries WHERE id=?",[tenant["industry_id"]]).fetchone() if tenant else None
+    slug = industry["slug"] if industry else "driving"
+    if slug in ('retail','restaurant','beauty'):
+        default = {
+            "shop": {"name":"","shortName":"","logo":"","phone":"","address":"","description":"","photos":[],"theme":{"primaryColor":"#ff6b35"}},
+            "products": [], "features": {"cart":True,"orderTracking":True}
+        }
+        key = "shop"
+    else:
+        default = {
+            "school": {"name":"","shortName":"","logo":"","phone":"","address":"","description":"","photos":[],"theme":{"primaryColor":"#1890ff"}},
+            "courses": [], "coaches": [], "locations": [], "features": {"appointment":True,"examPrep":True,"onlinePayment":False}
+        }
+        key = "school"
     if tenant:
-        default["school"]["name"] = tenant["name"] or ""
-        default["school"]["shortName"] = tenant["short_name"] or ""
-        default["school"]["phone"] = tenant["contact_phone"] or ""
+        default[key]["name"] = tenant["name"] or ""
+        default[key]["shortName"] = tenant["short_name"] or ""
+        default[key]["phone"] = tenant["contact_phone"] or ""
     d.close()
     return jsonify({"tenant_id":tid, "version":0, "config":default, "status":"draft"})
 
