@@ -161,7 +161,7 @@ def wechat_callback():
                     latest = d2.execute("SELECT * FROM configs WHERE tenant_id=? ORDER BY version DESC LIMIT 1", [tenant["id"]]).fetchone()
                     if latest:
                         cfg = json.loads(latest["config"])
-                        cfg["school"]["appId"] = appid
+                        (cfg.get("school") or cfg.get("shop") or {})["appId"] = appid
                         new_ver = latest["version"] + 1
                         d2.execute("INSERT INTO configs (tenant_id,version,config,status,mini_appid) VALUES (?,?,?,?,?)",
                                   [tenant["id"], new_ver, json.dumps(cfg, ensure_ascii=False), "draft", appid])
@@ -1707,7 +1707,7 @@ def handle_auth_callback(tid, auth_code):
         latest = d.execute("SELECT * FROM configs WHERE tenant_id=? ORDER BY version DESC LIMIT 1", [tid]).fetchone()
         if latest:
             cfg = json.loads(latest["config"])
-            cfg["school"]["appId"] = appid
+            (cfg.get("school") or cfg.get("shop") or {})["appId"] = appid
             d.execute("INSERT INTO configs (tenant_id,version,config,status,mini_appid) VALUES (?,?,?,?,?)",
                       [tid, latest["version"]+1, json.dumps(cfg, ensure_ascii=False), "draft", appid])
         d.commit(); d.close()
@@ -1730,9 +1730,9 @@ def wechat_upload_code(tid):
         "extAppid": auth["authorizer_appid"],
         "directCommit": False,
         "ext": {
-            "schoolName": cfg["school"]["name"],
-            "schoolPhone": cfg["school"]["phone"],
-            "primaryColor": cfg["school"]["theme"]["primaryColor"]
+            "schoolName": (cfg.get("school") or cfg.get("shop") or {}).get("name",""),
+            "schoolPhone": (cfg.get("school") or cfg.get("shop") or {}).get("phone",""),
+            "primaryColor": (cfg.get("school") or cfg.get("shop") or {}).get("theme",{}).get("primaryColor","#1890ff")
         }
     }, ensure_ascii=False)
 
@@ -1868,7 +1868,7 @@ def customer_upload_bg(tid):
     latest = d.execute("SELECT * FROM configs WHERE tenant_id=? ORDER BY version DESC LIMIT 1", [tid]).fetchone()
     if latest:
         cfg = json.loads(latest["config"])
-        cfg["school"]["photos"] = [url]
+        (cfg.get("school") or cfg.get("shop") or {})["photos"] = [url]
         new_ver = latest["version"] + 1
         d.execute("INSERT INTO configs (tenant_id,version,config,status,mini_appid,mini_appname) VALUES (?,?,?,?,?,?)",
                   [tid, new_ver, json.dumps(cfg, ensure_ascii=False), "draft", latest["mini_appid"] or "", latest["mini_appname"] or ""])
