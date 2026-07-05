@@ -1851,6 +1851,31 @@ def wechat_fast_register(tid):
     return jsonify({"ok": True, "qrcode_base64": resp.get("qrcode_url", ""),
                     "tip": "请将二维码发给法人，用微信扫码后在小程序内确认。确认后小程序自动创建并授权给平台。"})
 
+# ==================== 小程序基本信息设置 ====================
+
+@app.route("/api/wechat/set-basic-info/<tid>", methods=["POST"])
+@require_admin
+def wechat_set_basic_info(tid):
+    """设置小程序基本信息：名称/头像/简介/类目"""
+    token = wx_get_authorizer_token(tid)
+    if not token: return jsonify({"error":"未授权"}),400
+    data = request.get_json()
+    results = []
+    # 设置简介
+    if data.get("signature"):
+        r = _requests.post(f"https://api.weixin.qq.com/wxa/modifysignature?access_token={token}",
+                          json={"signature": data["signature"][:120]}).json()
+        results.append(("简介", r.get("errcode",-1)==0))
+    # 设置头像（需要media_id，先上传图片）
+    if data.get("head_img_url"):
+        results.append(("头像", "需通过素材接口上传，暂跳过"))
+    # 设置名称（需审核）
+    if data.get("nickname"):
+        r = _requests.post(f"https://api.weixin.qq.com/wxa/setnickname?access_token={token}",
+                          json={"nick_name": data["nickname"], "id_card": data.get("id_card",""), "license": data.get("license","")}).json()
+        results.append(("名称", r.get("errcode",-1)==0))
+    return jsonify({"ok":True, "results": [{"item":item, "ok":ok} for item,ok in results]})
+
 # ==================== 图片上传 ====================
 import os as _os
 UPLOAD_DIR = "/opt/jiaxiao/static/uploads"
