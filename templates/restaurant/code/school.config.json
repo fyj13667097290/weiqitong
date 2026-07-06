@@ -1,7 +1,29 @@
 {
-  "_meta": { "tenantId": "t202606300935551af6", "apiBase": "https://jiaxiao.t-hub.cc" },
-  "shop": { "name": "{{shop_name}}", "shortName": "{{shop_short_name}}", "logo": "{{shop_logo}}", "phone": "{{shop_phone}}", "address": "{{shop_address}}", "description": "{{shop_description}}", "photos": [], "theme": { "primaryColor": "{{primary_color}}" } },
+  "_meta": {
+    "tenantId": "t202606300935551af6",
+    "apiBase": "https://jiaxiao.t-hub.cc"
+  },
+  "shop": {
+    "name": "{{shop_name}}",
+    "shortName": "{{shop_short_name}}",
+    "logo": "{{shop_logo}}",
+    "phone": "{{shop_phone}}",
+    "address": "{{shop_address}}",
+    "description": "{{shop_description}}",
+    "photos": [],
+    "theme": {
+      "primaryColor": "#ff6b35"
+    }
+  },
   "products": [],
-  "categories": ["全部","热销","新品","特价"],
-  "features": { "cart": true, "orderTracking": true }
+  "categories": [
+    "全部",
+    "热销",
+    "新品",
+    "特价"
+  ],
+  "features": {
+    "cart": true,
+    "orderTracking": true
+  }
 }

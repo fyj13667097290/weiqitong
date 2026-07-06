@@ -94,9 +94,23 @@ config._meta = config._meta || {};
 config._meta.tenantId = config._meta.tenantId || path.basename(outputDir);
 config._meta.apiBase = config._meta.apiBase || 'https://jiaxiao.t-hub.cc';
 
-// 6. 写入完整 school.config.json
+// 6. 写入完整 school.config.json（清除残留占位符）
+const configStr = JSON.stringify(config, null, 2);
+const cleanedConfig = configStr.split('{{primary_color}}').join(entity.theme?.primaryColor || '#1890ff')
+  .split('{{school_name}}').join(entity.name || '')
+  .split('{{shop_name}}').join(entity.name || '')
+  .split('{{school_short_name}}').join(entity.shortName || entity.name || '')
+  .split('{{shop_short_name}}').join(entity.shortName || entity.name || '')
+  .split('{{school_phone}}').join(entity.phone || '')
+  .split('{{shop_phone}}').join(entity.phone || '')
+  .split('{{school_address}}').join(entity.address || '')
+  .split('{{shop_address}}').join(entity.address || '')
+  .split('{{school_description}}').join(entity.description || '')
+  .split('{{shop_description}}').join(entity.description || '')
+  .split('{{school_logo}}').join(entity.logo || '')
+  .split('{{shop_logo}}').join(entity.logo || '');
 const configDest = path.join(outputDir, 'school.config.json');
-fs.writeFileSync(configDest, JSON.stringify(config, null, 2), 'utf-8');
+fs.writeFileSync(configDest, cleanedConfig, 'utf-8');
 
 // 6. 生成 project.config.json
 const projectConfig = {
