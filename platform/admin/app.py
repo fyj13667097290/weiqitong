@@ -970,7 +970,7 @@ def config_page(tid):
     industry = d.execute("SELECT slug FROM industries WHERE id=?",[t["industry_id"]]).fetchone()
     d.close()
     slug = industry["slug"] if industry else "driving"
-    if slug in ('retail','restaurant','beauty'):
+    if slug in ('retail','restaurant','beauty','homeservice','hotel','pet'):
         return render_template_string(RETAIL_CONFIG, tenant=row2dict(t))
     return render_template_string(HTML_CONFIG, tenant=row2dict(t))
 
@@ -1047,7 +1047,7 @@ def api_get_config(tid):
     # 根据行业返回不同默认配置
     industry = d.execute("SELECT slug FROM industries WHERE id=?",[tenant["industry_id"]]).fetchone() if tenant else None
     slug = industry["slug"] if industry else "driving"
-    if slug in ('retail','restaurant','beauty'):
+    if slug in ('retail','restaurant','beauty','homeservice','hotel','pet'):
         default = {
             "shop": {"name":"","shortName":"","logo":"","phone":"","address":"","description":"","photos":[],"theme":{"primaryColor":"#ff6b35"}},
             "products": [], "features": {"cart":True,"orderTracking":True}
@@ -1559,7 +1559,7 @@ def customer_dashboard(tid):
     categories = d.execute("SELECT * FROM dynamic_categories WHERE tenant_id=? AND is_active=1 ORDER BY sort_order",[tid]).fetchall()
     appointments = d.execute("SELECT * FROM appointments WHERE tenant_id=? ORDER BY created_at DESC LIMIT 20", [tid]).fetchall()
     d.close()
-    if industry_slug in ('retail','restaurant','beauty'):
+    if industry_slug in ('retail','restaurant','beauty','homeservice','hotel','pet'):
         return render_template_string(RETAIL_DASHBOARD, tenant=dict(t), announcements=announcements, categories=categories)
     return render_template_string(CUSTOMER_DASHBOARD, tenant=dict(t), announcements=announcements, courses=courses, coaches=coaches, appointments=appointments, industry_slug='driving')
 
