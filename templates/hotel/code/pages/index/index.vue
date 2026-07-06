@@ -9,7 +9,7 @@
 <view class="act" @tap="callShop"><view class="act-icon bg4">📞</view><text>联系前台</text></view></view>
 <view class="section"><text class="stitle">🛏️ 推荐房型</text>
 <scroll-view scroll-x class="room-scroll">
-<view class="room-card" v-for="i in 3" :key="i" @tap="goServices"><view class="room-img">🏨</view><text class="room-name">{{['大床房','双床房','套房'][i-1]}}</text><text class="room-price">¥{{[188,268,388][i-1]}}/晚</text></view></scroll-view></view>
+<view class="room-card" v-for="i in 3" :key="i" @tap="goServices"><view class="room-img">🏨</view><text class="room-name">{{['大床房','双床房','套房'][i-1]}}</text><text class="room-price">¥188/晚</text></view></scroll-view></view>
 <view class="section" v-if="shop.address"><text class="stitle">📍 {{shop.address}}</text></view>
 </view></template>
 <script>import config from '../../school.config.json';export default{data(){return{shop:config.shop,theme:config.shop.theme}},methods:{goServices(){uni.navigateTo({url:'/pages/services/services'})},goBooking(){uni.navigateTo({url:'/pages/booking/booking'})},goOrders(){uni.switchTab({url:'/pages/orders/orders'})},callShop(){uni.makePhoneCall({phoneNumber:this.shop.phone})}}}</script>
