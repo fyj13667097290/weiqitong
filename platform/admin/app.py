@@ -1505,6 +1505,7 @@ th{color:#999;font-weight:500}.empty{text-align:center;color:#bbb;padding:20px}
 {% for c in coaches %}<tr><td>{{c.name}}</td><td>{{c.experience}}年</td><td>{{c.rating or '-'}}</td><td><a class="btn-sm btn-del" href="/school/{{tenant.id}}/coach/{{c.id}}/delete" onclick="return confirm('确定删除？')">删除</a></td></tr>{% endfor %}</table>
 {% else %}<p class="empty">暂无教练</p>{% endif %}</div>
 
+<div class="card"><h3>🎫 优惠券 <a href="/school/{{tenant.id}}/coupons">管理</a></h3><p style="font-size:13px;color:#666">创建满减券/新人券，小程序首页自动展示</p></div>
 <div class="card"><h3>📦 商品管理 <a href="/school/{{tenant.id}}/products">管理</a></h3>
 <p style="font-size:13px;color:#666">添加/编辑/删除商品</p></div>
 <div class="card"><h3>📂 商品类目 <a href="/school/{{tenant.id}}/categories">管理</a></h3>
@@ -2048,6 +2049,45 @@ def customer_appointment_complete(tid, aid):
     if (request.cookies.get("school_admin") != tid and request.cookies.get("admin_token") != get_admin_pw()): return redirect(f"/school/{tid}/login")
     d = db(); d.execute("UPDATE appointments SET status='completed' WHERE id=? AND tenant_id=?", [aid, tid]); d.commit(); d.close()
     return redirect(f"/school/{tid}/dashboard")
+
+# ==================== 优惠券管理 ====================
+
+@app.route("/school/<tid>/coupons", methods=["GET","POST"])
+def customer_coupons(tid):
+    if request.cookies.get("school_admin") != tid and request.cookies.get("admin_token") != get_admin_pw():
+        return redirect(f"/school/{tid}/login")
+    d = db()
+    t = d.execute("SELECT * FROM tenants WHERE id=?",[tid]).fetchone()
+    if request.method == "POST":
+        d.execute("INSERT INTO dynamic_coupons (tenant_id,title,discount,min_spend,total_qty,expire_date) VALUES (?,?,?,?,?,?)",
+                  [tid, request.form["title"], float(request.form.get("discount",0)), float(request.form.get("min_spend",0)), int(request.form.get("total_qty",100)), request.form.get("expire_date","")])
+        d.commit(); d.close(); return redirect(f"/school/{tid}/coupons")
+    coupons = d.execute("SELECT * FROM dynamic_coupons WHERE tenant_id=? AND is_active=1 ORDER BY created_at DESC",[tid]).fetchall()
+    d.close()
+    rows = "".join([f"<tr><td>{c['title']}</td><td>减¥{c['discount']}</td><td>满¥{c['min_spend']}</td><td>{c['total_qty']-c['used_qty']}/{c['total_qty']}</td><td>{c['expire_date'] or '长期'}</td><td><a href='/school/{tid}/coupon/{c['id']}/delete' onclick=\"return confirm('删除？')\" style='color:#ff4d4f;font-size:12px'>删除</a></td></tr>" for c in coupons])
+    return f"""<!DOCTYPE html><html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>优惠券管理</title>
+<style>*{{margin:0;padding:0}}body{{font-family:-apple-system,sans-serif;background:#f0f2f5;padding:20px}}.card{{background:#fff;max-width:600px;margin:20px auto;padding:24px;border-radius:12px;box-shadow:0 2rpx 12rpx rgba(0,0,0,.06)}}
+h3{{font-size:18px;margin-bottom:16px}}table{{width:100%;border-collapse:collapse;font-size:13px}}th,td{{padding:8px 10px;text-align:left;border-bottom:1px solid #f0f0f0}}th{{color:#999}}
+form{{display:flex;gap:10px;margin-top:12px;flex-wrap:wrap}}input{{flex:1;min-width:80px;padding:8px;border:1px solid #d9d9d9;border-radius:4px;font-size:13px}}
+.btn{{padding:8px 16px;background:#667eea;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:13px}}a{{color:#999;text-decoration:none;font-size:13px}}
+</style></head><body><div class="card"><h3>🎫 {t['name']} · 优惠券</h3>
+{table or '<p style="color:#bbb;text-align:center;padding:20px">暂无优惠券</p>'}</table>
+<form method="POST"><input name="title" placeholder="券名(新人券/满减券)" required><input name="discount" placeholder="减多少" type="number" required style="max-width:80px"><input name="min_spend" placeholder="满多少" type="number" value="0" style="max-width:80px"><input name="total_qty" placeholder="数量" type="number" value="100" style="max-width:70px"><input name="expire_date" placeholder="到期日(YYYY-MM-DD)" style="max-width:150px"><button class="btn" type="submit">添加</button></form>
+<p style="margin-top:16px"><a href="/school/{tid}/dashboard">← 返回</a></p></div></body></html>"""
+
+@app.route("/school/<tid>/coupon/<int:cid>/delete")
+def customer_coupon_delete(tid, cid):
+    if request.cookies.get("school_admin") != tid and request.cookies.get("admin_token") != get_admin_pw():
+        return redirect(f"/school/{tid}/login")
+    d = db(); d.execute("UPDATE dynamic_coupons SET is_active=0 WHERE id=? AND tenant_id=?",[cid,tid]); d.commit(); d.close()
+    return redirect(f"/school/{tid}/coupons")
+
+@app.route("/api/public/<tid>/coupons")
+def api_public_coupons(tid):
+    d = db()
+    rows = d.execute("SELECT title,discount,min_spend FROM dynamic_coupons WHERE tenant_id=? AND is_active=1 AND (expire_date IS NULL OR expire_date>=date('now')) AND used_qty<total_qty ORDER BY created_at DESC LIMIT 5",[tid]).fetchall()
+    d.close()
+    return jsonify([dict(r) for r in rows])
 
 # ==================== 商品管理（零售/餐饮/美业等） ====================
 
