@@ -1505,6 +1505,8 @@ th{color:#999;font-weight:500}.empty{text-align:center;color:#bbb;padding:20px}
 {% for c in coaches %}<tr><td>{{c.name}}</td><td>{{c.experience}}年</td><td>{{c.rating or '-'}}</td><td><a class="btn-sm btn-del" href="/school/{{tenant.id}}/coach/{{c.id}}/delete" onclick="return confirm('确定删除？')">删除</a></td></tr>{% endfor %}</table>
 {% else %}<p class="empty">暂无教练</p>{% endif %}</div>
 
+<div class="card"><h3>📦 商品管理 <a href="/school/{{tenant.id}}/products">管理</a></h3>
+<p style="font-size:13px;color:#666">添加/编辑/删除商品</p></div>
 <div class="card"><h3>📂 商品类目 <a href="/school/{{tenant.id}}/categories">管理</a></h3>
 <p style="font-size:13px;color:#666">自定义商品分类</p></div>
 
@@ -2046,6 +2048,45 @@ def customer_appointment_complete(tid, aid):
     if (request.cookies.get("school_admin") != tid and request.cookies.get("admin_token") != get_admin_pw()): return redirect(f"/school/{tid}/login")
     d = db(); d.execute("UPDATE appointments SET status='completed' WHERE id=? AND tenant_id=?", [aid, tid]); d.commit(); d.close()
     return redirect(f"/school/{tid}/dashboard")
+
+# ==================== 商品管理（零售/餐饮/美业等） ====================
+
+@app.route("/school/<tid>/products", methods=["GET","POST"])
+def customer_products(tid):
+    if request.cookies.get("school_admin") != tid and request.cookies.get("admin_token") != get_admin_pw():
+        return redirect(f"/school/{tid}/login")
+    d = db()
+    t = d.execute("SELECT * FROM tenants WHERE id=?",[tid]).fetchone()
+    if request.method == "POST":
+        d.execute("INSERT INTO dynamic_products (tenant_id,name,price,category,tag) VALUES (?,?,?,?,?)",
+                  [tid, request.form["name"], float(request.form.get("price",0)), request.form.get("category",""), request.form.get("tag","")])
+        d.commit(); d.close(); return redirect(f"/school/{tid}/products")
+    products = d.execute("SELECT * FROM dynamic_products WHERE tenant_id=? AND is_visible=1 ORDER BY sort_order,id",[tid]).fetchall()
+    d.close()
+    rows = "".join([f"<tr><td>{p['name']}</td><td>¥{p['price']}</td><td>{p['category'] or '-'}</td><td>{p['tag'] or '-'}</td><td><a href='/school/{tid}/product/{p['id']}/delete' onclick=\"return confirm('删除？')\" style='color:#ff4d4f;font-size:12px'>删除</a></td></tr>" for p in products])
+    return f"""<!DOCTYPE html><html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>商品管理</title>
+<style>*{{margin:0;padding:0}}body{{font-family:-apple-system,sans-serif;background:#f0f2f5;padding:20px}}.card{{background:#fff;max-width:600px;margin:20px auto;padding:24px;border-radius:12px;box-shadow:0 2rpx 12rpx rgba(0,0,0,.06)}}
+h3{{font-size:18px;margin-bottom:16px}}table{{width:100%;border-collapse:collapse;font-size:14px}}th,td{{padding:8px 12px;text-align:left;border-bottom:1px solid #f0f0f0}}th{{color:#999}}
+form{{display:flex;gap:10px;margin-top:12px;flex-wrap:wrap}}input{{flex:1;min-width:80px;padding:8px;border:1px solid #d9d9d9;border-radius:4px;font-size:14px}}
+.btn{{padding:8px 16px;background:#667eea;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:13px}}a{{color:#999;text-decoration:none;font-size:13px}}
+</style></head><body><div class="card"><h3>📦 {t['name']} · 商品管理</h3>
+{table or '<p style="color:#bbb;text-align:center;padding:20px">暂无商品</p>'}</table>
+<form method="POST"><input name="name" placeholder="商品名称" required><input name="price" placeholder="价格" type="number" required style="max-width:100px"><input name="category" placeholder="分类" style="max-width:100px"><input name="tag" placeholder="标签(热销/新品)" style="max-width:100px"><button class="btn" type="submit">添加</button></form>
+<p style="margin-top:16px"><a href="/school/{tid}/dashboard">← 返回</a></p></div></body></html>"""
+
+@app.route("/school/<tid>/product/<int:pid>/delete")
+def customer_product_delete(tid, pid):
+    if request.cookies.get("school_admin") != tid and request.cookies.get("admin_token") != get_admin_pw():
+        return redirect(f"/school/{tid}/login")
+    d = db(); d.execute("UPDATE dynamic_products SET is_visible=0 WHERE id=? AND tenant_id=?",[pid,tid]); d.commit(); d.close()
+    return redirect(f"/school/{tid}/products")
+
+@app.route("/api/public/<tid>/products")
+def api_public_products(tid):
+    d = db()
+    rows = d.execute("SELECT id,name,price,image,category,tag FROM dynamic_products WHERE tenant_id=? AND is_visible=1 ORDER BY sort_order,id",[tid]).fetchall()
+    d.close()
+    return jsonify([dict(r) for r in rows])
 
 # ==================== 类目管理 ====================
 
