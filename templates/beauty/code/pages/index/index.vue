@@ -1,72 +1,14 @@
-<template>
-  <view class="page">
-    <view class="hero" :style="{backgroundColor: theme.primaryColor}">
-      <view class="hero-content">
-        <image class="hero-logo" :src="shop.logo" mode="aspectFit" v-if="shop.logo" />
-        <text class="hero-name">{{shop.shortName || shop.name}}</text>
-        <text class="hero-desc" v-if="shop.description">{{shop.description}}</text>
-      </view>
-    </view>
-
-    <view class="notice" v-if="shop.phone" @tap="callShop">
-      <text class="notice-icon">📞</text>
-      <text class="notice-text">联系店家 · {{shop.phone}}</text>
-    </view>
-
-    <view class="section" v-if="allProducts.length">
-      <view class="section-title"><text class="sdot"></text>热门商品<navigator url="/pages/products/products" class="smore">全部</navigator></view>
-      <view class="product-grid">
-        <view class="product-card" v-for="(p,i) in allProducts.slice(0,6)" :key="i" @tap="goProducts">
-          <view class="p-img-wrap"><text class="p-img-placeholder">📦</text></view>
-          <text class="p-name">{{p.name}}</text>
-          <view class="p-price-box"><text class="p-price">¥{{p.price}}</text><text class="p-tag" v-if="p.tag">{{p.tag}}</text></view>
-        </view>
-      </view>
-    </view>
-
-    <view class="section" v-if="shop.address">
-      <view class="section-title"><text class="sdot"></text>店铺信息</view>
-      <view class="info-card" @tap="goMap">
-        <text class="info-addr">{{shop.address}}</text>
-        <text class="info-tel" v-if="shop.phone">{{shop.phone}}</text>
-      </view>
-    </view>
-
-    <view class="footer"><text>{{shop.name}}</text></view>
-  </view>
-</template>
-<script>
-import config from '../../school.config.json';
-var TID=(config._meta&&config._meta.tenantId)||'',API=(config._meta&&config._meta.apiBase)||'';
-function getList(p){ return new Promise(function(resolve){ uni.request({url:API+'/api/public/'+TID+'/'+p,success:function(r){resolve(r.data)},fail:function(){resolve([])}}); }); }
-export default {
-  data(){ return { shop:config.shop, theme:config.shop.theme, allProducts:config.products||[] }; },
-  onLoad(){ var s=this; getList('products').then(function(r){ if(r.length)s.allProducts=r; }); },
-  methods: {
-    goProducts(){ uni.navigateTo({url:'/pages/products/products'}); },
-    goMap(){ uni.openLocation({address:this.shop.address}); },
-    callShop(){ uni.makePhoneCall({phoneNumber:this.shop.phone}); }
-  }
-}
-</script>
-<style scoped>
-.page{background:#f5f5f5;min-height:100vh}
-.hero{padding:50rpx 30rpx 40rpx;color:#fff;text-align:center}
-.hero-logo{width:100rpx;height:100rpx;border-radius:20rpx;border:3rpx solid rgba(255,255,255,.4);margin-bottom:12rpx;background:#fff}
-.hero-name{font-size:42rpx;font-weight:800;display:block}.hero-desc{font-size:24rpx;opacity:.85;margin-top:8rpx;display:block}
-.notice{display:flex;align-items:center;margin:20rpx 24rpx;padding:16rpx 20rpx;background:#fff;border-radius:12rpx;box-shadow:0 2rpx 8rpx rgba(0,0,0,.04)}
-.notice-icon{margin-right:12rpx;font-size:28rpx}.notice-text{font-size:26rpx;color:#333}
-.section{background:#fff;margin:0 24rpx 20rpx;border-radius:16rpx;padding:24rpx;box-shadow:0 2rpx 8rpx rgba(0,0,0,.04)}
-.section-title{display:flex;align-items:center;font-size:32rpx;font-weight:700;margin-bottom:20rpx}
-.sdot{width:10rpx;height:28rpx;border-radius:5rpx;margin-right:12rpx;display:inline-block}
-.smore{margin-left:auto;font-size:26rpx;color:#999}
-.product-grid{display:flex;flex-wrap:wrap;gap:16rpx}
-.product-card{flex:0 0 calc(33.33% - 11rpx);text-align:center;margin-bottom:8rpx}
-.p-img-wrap{width:100%;aspect-ratio:1;background:#f8f8f8;border-radius:12rpx;display:flex;align-items:center;justify-content:center;margin-bottom:10rpx}
-.p-img-placeholder{font-size:60rpx}
-.p-name{font-size:26rpx;font-weight:500;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.p-price-box{display:flex;justify-content:center;align-items:center;gap:6rpx;margin-top:6rpx}
-.p-price{font-size:28rpx;font-weight:700;color:#ff4d4f}.p-tag{font-size:18rpx;background:#ff4d4f;color:#fff;padding:2rpx 8rpx;border-radius:6rpx}
-.info-card{background:#fafafa;padding:20rpx;border-radius:8rpx}.info-addr{font-size:28rpx;display:block}.info-tel{font-size:24rpx;color:#1890ff;margin-top:8rpx;display:block}
-.footer{text-align:center;padding:40rpx;color:#ccc;font-size:22rpx}
-</style>
+<template><view class="page">
+<view class="hero" :style="{backgroundColor:theme.primaryColor}"><view class="hero-content"><text class="hero-name">{{shop.shortName||shop.name}}</text><text class="hero-desc">{{shop.description}}</text></view></view>
+<view class="banner"><text class="banner-icon">🎁</text><text class="banner-text">新客首次体验5折 · 闺蜜同行一人免单</text></view>
+<view class="actions"><view class="act" @tap="goProducts"><view class="act-icon bg1">💅</view><text>服务项目</text></view>
+<view class="act" @tap="goBooking"><view class="act-icon bg2">📅</view><text>预约到店</text></view>
+<view class="act" @tap="goOrders"><view class="act-icon bg3">📋</view><text>我的订单</text></view>
+<view class="act" @tap="callShop"><view class="act-icon bg4">📞</view><text>联系店家</text></view></view>
+<view class="section"><text class="stitle">💎 热门服务</text><view class="svc-list"><view class="svc-row" @tap="goBooking"><text>法式美甲</text><text class="svc-p">¥168</text><text class="svc-t">热销</text></view>
+<view class="svc-row" @tap="goBooking"><text>韩式纹眉</text><text class="svc-p">¥288</text><text class="svc-t">推荐</text></view>
+<view class="svc-row" @tap="goBooking"><text>面部清洁护理</text><text class="svc-p">¥128</text><text class="svc-t"></text></view></view></view>
+<view class="section" v-if="shop.address"><text class="stitle">📍 {{shop.address}}</text></view>
+</view></template>
+<script>import config from '../../school.config.json';export default{data(){return{shop:config.shop,theme:config.shop.theme}},methods:{goProducts(){uni.navigateTo({url:'/pages/products/products'})},goBooking(){uni.navigateTo({url:'/pages/booking/booking'})},goOrders(){uni.switchTab({url:'/pages/orders/orders'})},goCart(){uni.switchTab({url:'/pages/cart/cart'})},callShop(){uni.makePhoneCall({phoneNumber:this.shop.phone})}}}</script>
+<style scoped>.page{background:#f5f5f5;min-height:100vh}.hero{padding:50rpx 30rpx 40rpx;color:#fff;text-align:center}.hero-name{font-size:44rpx;font-weight:800}.hero-desc{font-size:24rpx;opacity:.85;margin-top:8rpx}.banner{display:flex;align-items:center;margin:20rpx 24rpx;padding:20rpx;background:linear-gradient(135deg,#e91e8c,#f06292);border-radius:14rpx;color:#fff}.banner-icon{margin-right:12rpx;font-size:32rpx}.banner-text{flex:1;font-size:26rpx;font-weight:500}.actions{display:flex;margin:20rpx 24rpx;background:#fff;border-radius:16rpx;padding:28rpx 0}.act{flex:1;text-align:center;font-size:24rpx}.act-icon{width:96rpx;height:96rpx;border-radius:24rpx;margin:0 auto 10rpx;display:flex;align-items:center;justify-content:center;font-size:44rpx}.bg1{background:#fce4ec}.bg2{background:#e8f5e9}.bg3{background:#e3f2fd}.bg4{background:#fff3e0}.section{margin:20rpx 24rpx;padding:20rpx;background:#fff;border-radius:12rpx}.stitle{font-size:30rpx;font-weight:700;display:block;margin-bottom:16rpx}.svc-row{display:flex;align-items:center;padding:16rpx 0;border-bottom:1rpx solid #f0f0f0;font-size:28rpx}.svc-p{margin-left:auto;color:#ff4d4f;font-weight:700;margin-right:12rpx}.svc-t{font-size:20rpx;background:#ff4d4f;color:#fff;padding:2rpx 8rpx;border-radius:6rpx}</style>

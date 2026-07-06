@@ -1,15 +1,13 @@
 <template><view class="page">
-<view class="hero" :style="{backgroundColor:theme.primaryColor}">
-<text class="hero-name">{{shop.shortName||shop.name}}</text>
-<text class="hero-desc" v-if="shop.description">{{shop.description}}</text>
-</view>
-<view class="actions">
-<view class="act" @tap="goServices"><view class="act-icon bg1">📋</view><text>服务项目</text></view>
-<view class="act" @tap="goBooking"><view class="act-icon bg2">📅</view><text>在线预约</text></view>
-<view class="act" @tap="goOrders"><view class="act-icon bg3">📦</view><text>我的订单</text></view>
-<view class="act" @tap="callShop"><view class="act-icon bg4">📞</view><text>联系我们</text></view>
-</view>
-<view class="section" v-if="shop.address"><view class="stitle">📍 {{shop.address}}</view></view>
+<view class="hero" :style="{backgroundColor:theme.primaryColor}"><view class="hero-content"><text class="hero-name">{{shop.shortName||shop.name}}</text><text class="hero-desc">{{shop.description}}</text></view></view>
+<view class="banner"><text class="banner-icon">🎉</text><text class="banner-text">新人首单立减 ¥20 · 满 ¥200 减 ¥50</text></view>
+<view class="actions"><view class="act" @tap="goServices"><view class="act-icon bg1">🧹</view><text>所有服务</text></view>
+<view class="act" @tap="goBooking"><view class="act-icon bg2">📅</view><text>立即预约</text></view>
+<view class="act" @tap="goOrders"><view class="act-icon bg3">📋</view><text>服务进度</text></view>
+<view class="act" @tap="callShop"><view class="act-icon bg4">📞</view><text>客服电话</text></view></view>
+<view class="section"><text class="stitle">🔥 热门服务</text>
+<view class="svc-card" v-for="(s,i) in services" :key="i" @tap="goBooking"><view class="svc-left"><text class="svc-name">{{s.name}}</text><text class="svc-desc">{{s.desc}}</text></view><text class="svc-price">¥{{s.price}}<text class="svc-unit">/次</text></text><text class="svc-tag" v-if="s.tag">{{s.tag}}</text></view></view>
+<view class="section"><text class="stitle">💬 客户评价</text><view class="review"><text>⭐ 5.0 "阿姨打扫得很干净，下次还找你们"</text></view><view class="review"><text>⭐ 4.9 "空调清洗很专业，师傅态度好"</text></view></view>
 </view></template>
-<script>import config from '../../school.config.json';export default{data(){return{shop:config.shop,theme:config.shop.theme}},methods:{goServices(){uni.navigateTo({url:'/pages/services/services'})},goBooking(){uni.navigateTo({url:'/pages/booking/booking'})},goOrders(){uni.switchTab({url:'/pages/orders/orders'})},callShop(){uni.makePhoneCall({phoneNumber:this.shop.phone})}}}</script>
-<style scoped>.page{background:#f5f5f5;min-height:100vh}.hero{padding:60rpx 30rpx;color:#fff;text-align:center}.hero-name{font-size:44rpx;font-weight:800}.hero-desc{font-size:26rpx;opacity:.85;margin-top:8rpx}.actions{display:flex;margin:20rpx 24rpx;background:#fff;border-radius:16rpx;padding:28rpx 0}.act{flex:1;text-align:center}.act-icon{width:96rpx;height:96rpx;border-radius:24rpx;margin:0 auto 10rpx;display:flex;align-items:center;justify-content:center;font-size:44rpx}.bg1{background:#e6f7ff}.bg2{background:#f0f5ff}.bg3{background:#fff7e6}.bg4{background:#f6ffed}.section{margin:20rpx 24rpx;padding:20rpx;background:#fff;border-radius:12rpx}.stitle{font-size:28rpx}</style>
+<script>import config from '../../school.config.json';export default{data(){return{shop:config.shop,theme:config.shop.theme,services:[{name:'钟点保洁',price:58,desc:'2小时起订·含基础清洁',tag:'热销'},{name:'深度开荒',price:388,desc:'新房装修后全屋清洁',tag:'推荐'},{name:'家电清洗',price:128,desc:'空调/洗衣机/油烟机',tag:''},{name:'管道疏通',price:98,desc:'厨房/卫生间下水道',tag:''}]}},methods:{goServices(){uni.navigateTo({url:'/pages/services/services'})},goBooking(){uni.navigateTo({url:'/pages/booking/booking'})},goOrders(){uni.switchTab({url:'/pages/orders/orders'})},callShop(){uni.makePhoneCall({phoneNumber:this.shop.phone})}}}</script>
+<style scoped>.page{background:#f5f5f5;min-height:100vh}.hero{padding:50rpx 30rpx 40rpx;color:#fff;text-align:center}.hero-name{font-size:44rpx;font-weight:800}.hero-desc{font-size:24rpx;opacity:.85;margin-top:8rpx}.banner{display:flex;align-items:center;margin:20rpx 24rpx;padding:20rpx;background:linear-gradient(135deg,#2196f3,#64b5f6);border-radius:14rpx;color:#fff}.banner-icon{margin-right:12rpx;font-size:32rpx}.banner-text{flex:1;font-size:26rpx;font-weight:500}.actions{display:flex;margin:20rpx 24rpx;background:#fff;border-radius:16rpx;padding:28rpx 0}.act{flex:1;text-align:center;font-size:24rpx}.act-icon{width:96rpx;height:96rpx;border-radius:24rpx;margin:0 auto 10rpx;display:flex;align-items:center;justify-content:center;font-size:44rpx}.bg1{background:#e3f2fd}.bg2{background:#e8f5e9}.bg3{background:#fff3e0}.bg4{background:#fce4ec}.section{margin:20rpx 24rpx;padding:20rpx;background:#fff;border-radius:12rpx}.stitle{font-size:30rpx;font-weight:700;display:block;margin-bottom:16rpx}.svc-card{display:flex;align-items:center;padding:20rpx;border:1rpx solid #eee;border-radius:12rpx;margin-bottom:12rpx;position:relative}.svc-left{flex:1}.svc-name{font-size:30rpx;font-weight:600}.svc-desc{font-size:24rpx;color:#999;display:block;margin-top:4rpx}.svc-price{font-size:30rpx;color:#ff4d4f;font-weight:700}.svc-unit{font-size:22rpx;font-weight:400}.svc-tag{position:absolute;top:12rpx;right:12rpx;background:#ff4d4f;color:#fff;font-size:20rpx;padding:2rpx 10rpx;border-radius:8rpx}.review{padding:16rpx 0;border-bottom:1rpx solid #f0f0f0;font-size:26rpx;color:#666}</style>

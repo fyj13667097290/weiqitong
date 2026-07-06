@@ -1,15 +1,13 @@
 <template><view class="page">
-<view class="hero" :style="{backgroundColor:theme.primaryColor}">
-<text class="hero-name">{{shop.shortName||shop.name}}</text>
-<text class="hero-desc" v-if="shop.description">{{shop.description}}</text>
-</view>
-<view class="actions">
-<view class="act" @tap="goServices"><view class="act-icon bg1">📋</view><text>服务项目</text></view>
+<view class="hero" :style="{backgroundColor:theme.primaryColor}"><view class="hero-content"><text class="hero-name">{{shop.shortName||shop.name}}</text><text class="hero-desc">{{shop.description}}</text></view></view>
+<view class="banner"><text class="banner-icon">🎁</text><text class="banner-text">新客首单8折 · 会员充值满500送100</text></view>
+<view class="actions"><view class="act" @tap="goServices"><view class="act-icon bg1">🐱</view><text>宠物服务</text></view>
 <view class="act" @tap="goBooking"><view class="act-icon bg2">📅</view><text>在线预约</text></view>
-<view class="act" @tap="goOrders"><view class="act-icon bg3">📦</view><text>我的订单</text></view>
-<view class="act" @tap="callShop"><view class="act-icon bg4">📞</view><text>联系我们</text></view>
-</view>
-<view class="section" v-if="shop.address"><view class="stitle">📍 {{shop.address}}</view></view>
+<view class="act" @tap="goOrders"><view class="act-icon bg3">📋</view><text>我的订单</text></view>
+<view class="act" @tap="callShop"><view class="act-icon bg4">📞</view><text>联系我们</text></view></view>
+<view class="section"><text class="stitle">🔥 热门服务</text><scroll-view scroll-x class="svc-scroll">
+<view class="svc-card" v-for="(s,i) in services" :key="i" @tap="goBooking"><view class="svc-icon">{{s.icon||'🐾'}}</view><text class="svc-name">{{s.name}}</text><text class="svc-price">¥{{s.price}}</text><text class="svc-tag" v-if="s.tag">{{s.tag}}</text></view></scroll-view></view>
+<view class="section" v-if="shop.address"><text class="stitle">📍 {{shop.address}}</text></view>
 </view></template>
-<script>import config from '../../school.config.json';export default{data(){return{shop:config.shop,theme:config.shop.theme}},methods:{goServices(){uni.navigateTo({url:'/pages/services/services'})},goBooking(){uni.navigateTo({url:'/pages/booking/booking'})},goOrders(){uni.switchTab({url:'/pages/orders/orders'})},callShop(){uni.makePhoneCall({phoneNumber:this.shop.phone})}}}</script>
-<style scoped>.page{background:#f5f5f5;min-height:100vh}.hero{padding:60rpx 30rpx;color:#fff;text-align:center}.hero-name{font-size:44rpx;font-weight:800}.hero-desc{font-size:26rpx;opacity:.85;margin-top:8rpx}.actions{display:flex;margin:20rpx 24rpx;background:#fff;border-radius:16rpx;padding:28rpx 0}.act{flex:1;text-align:center}.act-icon{width:96rpx;height:96rpx;border-radius:24rpx;margin:0 auto 10rpx;display:flex;align-items:center;justify-content:center;font-size:44rpx}.bg1{background:#e6f7ff}.bg2{background:#f0f5ff}.bg3{background:#fff7e6}.bg4{background:#f6ffed}.section{margin:20rpx 24rpx;padding:20rpx;background:#fff;border-radius:12rpx}.stitle{font-size:28rpx}</style>
+<script>import config from '../../school.config.json';export default{data(){return{shop:config.shop,theme:config.shop.theme,services:[{name:'洗护美容',price:128,tag:'热销',icon:'🛁'},{name:'宠物寄养',price:68,tag:'推荐',icon:'🏠'},{name:'体内外驱虫',price:88,tag:'',icon:'💊'},{name:'基础体检',price:58,tag:'',icon:'🩺'},{name:'疫苗接种',price:158,tag:'',icon:'💉'}]}},methods:{goServices(){uni.navigateTo({url:'/pages/services/services'})},goBooking(){uni.navigateTo({url:'/pages/booking/booking'})},goOrders(){uni.switchTab({url:'/pages/orders/orders'})},callShop(){uni.makePhoneCall({phoneNumber:this.shop.phone})}}}</script>
+<style scoped>.page{background:#f5f5f5;min-height:100vh}.hero{padding:50rpx 30rpx 40rpx;color:#fff;text-align:center}.hero-name{font-size:44rpx;font-weight:800}.hero-desc{font-size:24rpx;opacity:.85;margin-top:8rpx}.banner{display:flex;align-items:center;margin:20rpx 24rpx;padding:20rpx;background:linear-gradient(135deg,#ff9800,#ffb74d);border-radius:14rpx;color:#fff}.banner-icon{margin-right:12rpx;font-size:32rpx}.banner-text{flex:1;font-size:26rpx;font-weight:500}.actions{display:flex;margin:20rpx 24rpx;background:#fff;border-radius:16rpx;padding:28rpx 0}.act{flex:1;text-align:center;font-size:24rpx}.act-icon{width:96rpx;height:96rpx;border-radius:24rpx;margin:0 auto 10rpx;display:flex;align-items:center;justify-content:center;font-size:44rpx}.bg1{background:#fff3e0}.bg2{background:#e8f5e9}.bg3{background:#e3f2fd}.bg4{background:#fce4ec}.section{margin:20rpx 24rpx;padding:20rpx;background:#fff;border-radius:12rpx}.stitle{font-size:30rpx;font-weight:700;display:block;margin-bottom:16rpx}.svc-scroll{white-space:nowrap}.svc-card{display:inline-block;width:180rpx;text-align:center;margin-right:16rpx;padding:16rpx;background:#fafafa;border-radius:12rpx;position:relative}.svc-icon{font-size:48rpx;display:block;margin-bottom:8rpx}.svc-name{font-size:26rpx;font-weight:600;display:block}.svc-price{font-size:24rpx;color:#ff4d4f;font-weight:700;display:block;margin-top:4rpx}.svc-tag{position:absolute;top:8rpx;right:8rpx;background:#ff4d4f;color:#fff;font-size:18rpx;padding:2rpx 8rpx;border-radius:6rpx}</style>
