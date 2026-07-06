@@ -1,0 +1,16 @@
+{
+  "pages": [
+    { "path": "pages/index/index", "style": { "navigationBarTitleText": "{{shop_short_name}}" } },
+    { "path": "pages/products/products", "style": { "navigationBarTitleText": "菜单" } },
+    { "path": "pages/cart/cart", "style": { "navigationBarTitleText": "点餐车" } },
+    { "path": "pages/orders/orders", "style": { "navigationBarTitleText": "我的订单" } },
+    { "path": "pages/mine/mine", "style": { "navigationBarTitleText": "我的" } }
+  ],
+  "globalStyle": { "navigationBarTextStyle": "white", "navigationBarTitleText": "点餐", "navigationBarBackgroundColor": "{{primary_color}}", "backgroundColor": "#f5f5f5" },
+  "tabBar": { "color": "#999999", "selectedColor": "{{primary_color}}", "list": [
+    { "pagePath": "pages/index/index", "text": "首页" },
+    { "pagePath": "pages/products/products", "text": "商品" },
+    { "pagePath": "pages/cart/cart", "text": "点餐车" },
+    { "pagePath": "pages/mine/mine", "text": "我的" }
+  ]}
+}
