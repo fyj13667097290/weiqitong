@@ -15,9 +15,17 @@ ADMIN_PW_FILE = "/opt/jiaxiao/platform/admin/.admin_password"
 
 # ==================== 微信第三方平台 ====================
 WX_COMPONENT_APPID = "wxf1d537dba4c5f6e9"
-WX_COMPONENT_SECRET = "56fd5df8a938e85447e2a8eb54bac7a1"
-WX_TOKEN = "weiqitong2026"
-WX_ENCODING_KEY = "FYJ3601211994062939321827089906115179196692"
+WX_CONFIG_FILE = "/opt/jiaxiao/platform/admin/.wx_config"
+def _load_wx_config():
+    try:
+        with open(WX_CONFIG_FILE) as f:
+            lines = f.read().strip().split("\n")
+            return {l.split("=",1)[0]: l.split("=",1)[1] for l in lines if "=" in l}
+    except: return {}
+_wx_cfg = _load_wx_config()
+WX_COMPONENT_SECRET = _wx_cfg.get("secret", "")
+WX_TOKEN = _wx_cfg.get("token", "weiqitong2026")
+WX_ENCODING_KEY = _wx_cfg.get("encoding_key", "")
 
 WX_CRYPTO = WeChatCrypto(WX_TOKEN, WX_ENCODING_KEY, WX_COMPONENT_APPID)
 WX_TICKET_FILE = "/opt/jiaxiao/platform/admin/.wx_ticket"
